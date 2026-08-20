@@ -1,4 +1,4 @@
-package models
+package models_storage
 
 var (
 	BASE  = "models/ggml-base.bin"

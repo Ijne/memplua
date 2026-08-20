@@ -1,15 +1,20 @@
 package server
 
-import "net/http"
+import (
+	"fmt"
+	"net/http"
+)
 
 type Server struct{}
 
 func (s *Server) Start() error {
 	http.HandleFunc("/ingest", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Println("Received request at /ingest")
 		body := make([]byte, r.ContentLength)
 		_, err := r.Body.Read(body)
-		if err != nil {
-			http.Error(w, "Failed to read request body", http.StatusInternalServerError)
+		if err.Error() != "EOF" {
+			fmt.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
