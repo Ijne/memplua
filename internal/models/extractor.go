@@ -27,24 +27,32 @@ func NewWhisperExtractor() *WhisperExtractor {
 		fmt.Printf("Error loading model: %v\n", err)
 		return nil
 	}
-	defer model.Close()
 
 	log.Println("Model loaded successfully")
 
 	return &WhisperExtractor{model: &model}
 }
 
+func (we WhisperExtractor) Close() {
+	if we.model != nil {
+		(*we.model).Close()
+	}
+}
+
 func (we WhisperExtractor) Extract(buf []byte) (data.Chunk, error) {
 	ctx, err := (*we.model).NewContext()
 	if err != nil {
+		fmt.Printf("Error creating context: %v\n", err)
 		return data.Chunk{}, err
 	}
 
 	if err := ctx.SetLanguage("auto"); err != nil {
+		fmt.Printf("Error setting language: %v\n", err)
 		return data.Chunk{}, err
 	}
 
 	if err := ctx.Process(Resample(buf), nil, nil, nil); err != nil {
+		fmt.Printf("Error processing audio: %v\n", err)
 		return data.Chunk{}, err
 	}
 

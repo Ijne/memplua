@@ -15,19 +15,19 @@ func Stream(source source.Source, extractor models.Extractor) <-chan data.Chunk 
 		return nil
 	}
 
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
+	ticker := time.NewTicker(20 * time.Second)
 	buf := make([]byte, 0, 20*44100*4)
 	chunks := make(chan data.Chunk)
 
 	go func() {
+		defer ticker.Stop()
+		log.Println("Stream started successfully.")
 		for {
 			select {
 			case data := <-source.Data():
 				buf = append(buf, data...)
 			case <-ticker.C:
 				if len(buf) < 16000*4*2 {
-					fmt.Println("Continued")
 					continue
 				}
 				snapshot := make([]byte, len(buf))

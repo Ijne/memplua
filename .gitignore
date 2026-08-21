@@ -1,3 +1,9 @@
 *.bin
 *.ps1
+*.3-x64
+*.dll
+*.exe
+*.gguf
+*.json
+*.txt
 TODO
