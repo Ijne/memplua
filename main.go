@@ -4,7 +4,6 @@ import (
 	"crawler/internal/models"
 	"crawler/internal/pipeline"
 	"crawler/internal/source/audio"
-	"log"
 )
 
 func main() {
@@ -19,13 +18,5 @@ func main() {
 	loopback_groups := pipeline.Grouper(pipeline.FWGrouper, loopback_chunks)
 	loopback_episodes := pipeline.Episoder(pipeline.SEEpisoder, loopback_groups)
 
-	for {
-		log.Println("Waiting for episode...")
-		episode, ok := <-loopback_episodes
-		if !ok {
-			log.Println("Episode channel closed, exiting.")
-			break
-		}
-		log.Println("Got episode:", episode)
-	}
+	pipeline.Writer(loopback_episodes)
 }

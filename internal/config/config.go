@@ -1,0 +1,6 @@
+package config
+
+const (
+	SOUND_RECORDING_DURATION int64 = 30
+	SOUND_BUFFER_SIZE        int64 = SOUND_RECORDING_DURATION * 48000 * 2 * 4 * 3 / 2
+)

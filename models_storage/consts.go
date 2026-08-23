@@ -1,6 +1,6 @@
 package models_storage
 
-var (
+const (
 	BASE  = "models_storage/ggml-base.bin"
 	SMALL = "models_storage/ggml-small-q5_1.bin"
 )

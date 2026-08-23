@@ -1,8 +1,8 @@
 package data
 
 type Chunk struct {
-	ID        string `json:"id"`
+	ID        int64  `json:"id"`
 	Source    string `json:"source"`
-	TimeStamp int64  `json:"timestamp"`
+	Timestamp int64  `json:"timestamp"`
 	Text      string `json:"text"`
 }

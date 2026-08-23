@@ -25,7 +25,6 @@ func (se simpleEpisoder) episodes(groups <-chan []data.Chunk) <-chan data.Episod
 
 	go func() {
 		for {
-			log.Println("Waiting for group...")
 			group, ok := <-groups
 			if !ok {
 				close(episodes)
@@ -39,11 +38,21 @@ func (se simpleEpisoder) episodes(groups <-chan []data.Chunk) <-chan data.Episod
 				continue
 			}
 
+			episode.Timestamp = group[0].Timestamp
+			episode.SourceChunks = ChunksIDs(group)
 			episodes <- episode
 		}
 	}()
 
 	return episodes
+}
+
+func ChunksIDs(chunks []data.Chunk) []int64 {
+	ids := make([]int64, len(chunks))
+	for i, chunk := range chunks {
+		ids[i] = chunk.ID
+	}
+	return ids
 }
 
 func Episoder(episoder_type string, groups <-chan []data.Chunk) <-chan data.Episode {

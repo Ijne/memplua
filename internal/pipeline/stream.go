@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"crawler/internal/config"
 	"crawler/internal/data"
 	"crawler/internal/models"
 	"crawler/internal/source"
@@ -15,13 +16,12 @@ func Stream(source source.Source, extractor models.Extractor) <-chan data.Chunk 
 		return nil
 	}
 
-	ticker := time.NewTicker(20 * time.Second)
-	buf := make([]byte, 0, 20*44100*4)
+	ticker := time.NewTicker(time.Duration(config.SOUND_RECORDING_DURATION) * time.Second)
+	buf := make([]byte, 0, config.SOUND_BUFFER_SIZE)
 	chunks := make(chan data.Chunk)
 
 	go func() {
 		defer ticker.Stop()
-		log.Println("Stream started successfully.")
 		for {
 			select {
 			case data := <-source.Data():

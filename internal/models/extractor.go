@@ -66,8 +66,9 @@ func (we WhisperExtractor) Extract(buf []byte) (data.Chunk, error) {
 	}
 
 	return data.Chunk{
+		ID:        time.Now().UnixNano(),
 		Source:    "whisper",
-		TimeStamp: time.Now().Unix(),
+		Timestamp: time.Now().Unix(),
 		Text:      result,
 	}, nil
 }

@@ -5,6 +5,7 @@ type Episode struct {
 	Timestamp    int64    `json:"timestamp"`
 	Topic        string   `json:"topic"`
 	KeyPoints    []string `json:"key_points"`
+	Summary      string   `json:"summary"`
 	Content      string   `json:"content"`
 	Confidence   float64  `json:"confidence"`
 	SourceChunks []int64  `json:"source_chunks"`

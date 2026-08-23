@@ -2,7 +2,6 @@ package pipeline
 
 import (
 	"crawler/internal/data"
-	"log"
 )
 
 var (
@@ -25,13 +24,11 @@ func (fw floatingWindow) groupChunks(chunks <-chan data.Chunk) <-chan []data.Chu
 		next_group := make([]data.Chunk, 0, fw.WindowSize)
 		counter := 0
 		for {
-			log.Println("Waiting for chunk...")
 			chunk, ok := <-chunks
 			if !ok {
 				close(groups)
 				return
 			}
-			log.Println("Got chunk:", chunk)
 			cur_group = append(cur_group, chunk)
 			counter++
 			if counter >= fw.WindowSize/2 {

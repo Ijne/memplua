@@ -8,13 +8,13 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"crawler/internal/data"
 )
 
 const (
-	MaxTokensLimit = 400
-	TargetTokens   = 300
+	MaxTokensLimit = 700
 )
 
 type LlamaClient struct {
@@ -49,9 +49,16 @@ type completionResponse struct {
 	Truncated       bool   `json:"truncated"`
 }
 
+type llmEpisodeResponse struct {
+	Topic      string   `json:"topic"`
+	KeyPoints  []string `json:"key_points"`
+	Summary    string   `json:"summary"`
+	Content    string   `json:"content"`
+	Confidence float64  `json:"confidence"`
+}
+
 func (l *LlamaClient) ProcessChunks(chunks []data.Chunk) (data.Episode, error) {
-	userPrompt := buildPrompt(chunks, TargetTokens)
-	fullPrompt := formatChatML(userPrompt)
+	fullPrompt := formatChatML(buildPrompt(chunks))
 
 	request := completionRequest{
 		Prompt:      fullPrompt,
@@ -96,12 +103,19 @@ func (l *LlamaClient) ProcessChunks(chunks []data.Chunk) (data.Episode, error) {
 		return data.Episode{}, fmt.Errorf("no JSON found in response: %s", result.Content)
 	}
 
-	var episode data.Episode
-	if err := json.Unmarshal([]byte(jsonContent), &episode); err != nil {
+	var llmResp llmEpisodeResponse
+	if err := json.Unmarshal([]byte(jsonContent), &llmResp); err != nil {
 		return data.Episode{}, fmt.Errorf("parse JSON: %w\nRaw: %s", err, jsonContent)
 	}
 
-	return episode, nil
+	return data.Episode{
+		ID:         fmt.Sprintf("episode_%d", time.Now().UnixNano()),
+		Topic:      llmResp.Topic,
+		KeyPoints:  llmResp.KeyPoints,
+		Summary:    llmResp.Summary,
+		Content:    llmResp.Content,
+		Confidence: llmResp.Confidence,
+	}, nil
 }
 
 func extractJSON(text string) string {
@@ -163,7 +177,7 @@ func formatChatML(userPrompt string) string {
 	var b strings.Builder
 
 	b.WriteString("<|im_start|>system\n")
-	b.WriteString(`Output ONLY JSON. No explanations. No think tags. Start with {. End with }.<|im_end|>\n`)
+	b.WriteString("/no_think\nOutput ONLY valid JSON. No explanations. No think tags. No markdown. Start with {. End with }.<|im_end|>\n")
 
 	b.WriteString("<|im_start|>user\n")
 	b.WriteString(userPrompt)
@@ -174,28 +188,30 @@ func formatChatML(userPrompt string) string {
 	return b.String()
 }
 
-func buildPrompt(chunks []data.Chunk, targetTokens int) string {
+func buildPrompt(chunks []data.Chunk) string {
 	var b strings.Builder
 
-	b.WriteString(`Create a JSON episode from these transcript chunks.
-Use this format:
-{"id":"...","timestamp":0,"topic":"...","key_points":[...],"content":"...","confidence":0.0,"source_chunks":[...]}
+	b.WriteString(`Analyze these transcript chunks and extract the knowledge episode.
 
-BE SHORT. ONE-LINE JSON ONLY.
+Return ONLY this JSON structure:
+{
+    "topic": "concise topic name",
+    "key_points": ["point 1", "point 2", "point 3"],
+    "summary": "one sentence summary",
+    "content": "detailed description of what was discussed",
+    "confidence": 0.0
+}
+
+confidence is 0.0-1.0 based on how clear and complete the information is.
+Do not invent information. Only use what is in the chunks.
 
 Chunks:
 `)
 
 	for i, chunk := range chunks {
-		chunkID := chunk.ID
-		if chunkID == "" {
-			chunkID = fmt.Sprintf("chunk_%d", i+1)
-		}
-
-		fmt.Fprintf(&b, "%d. %s\n", i+1, strings.TrimSpace(chunk.Text))
+		fmt.Fprintf(&b, "[%d] %s\n", i+1, strings.TrimSpace(chunk.Text))
 	}
 
 	b.WriteString("\nJSON:")
-
 	return b.String()
 }
