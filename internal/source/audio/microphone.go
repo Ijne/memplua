@@ -1,6 +1,10 @@
 package audio
 
 import (
+	"crawler/internal/config"
+	"crawler/internal/data"
+	"crawler/internal/models"
+	"crawler/models_storage"
 	"fmt"
 	"time"
 	"unsafe"
@@ -10,15 +14,24 @@ import (
 )
 
 func GetMicrophoneSource() *MicrophoneSource {
-	return &MicrophoneSource{
-		stopChan: make(chan struct{}),
-		data:     make(chan []byte),
+	vad, _ := models.NewSilero(models_storage.SILERO) // TODO: Handle error properly
+	extractor := models.NewWhisperExtractor()
+
+	mic := &MicrophoneSource{
+		vad:       vad,
+		extractor: extractor,
+		stopChan:  make(chan struct{}),
+		data:      make(chan []byte),
 	}
+
+	return mic
 }
 
 type MicrophoneSource struct {
-	stopChan chan struct{}
-	data     chan []byte
+	vad       models.VAD
+	extractor models.Extractor
+	stopChan  chan struct{}
+	data      chan []byte
 }
 
 func (m *MicrophoneSource) Start() error {
@@ -67,7 +80,7 @@ func (m *MicrophoneSource) Start() error {
 			select {
 			case <-m.stopChan:
 				return
-			case <-time.After(1 * time.Millisecond):
+			case <-time.After(time.Duration(config.SOUND_RECORDING_TICK) * time.Millisecond):
 				acc.GetBuffer(&data, &availableFrameSize, &flags, &devicePosition, &qcpPosition)
 
 				if availableFrameSize == 0 {
@@ -102,6 +115,66 @@ func (m *MicrophoneSource) Stop() error {
 	return nil
 }
 
-func (m *MicrophoneSource) Data() <-chan []byte {
-	return m.data
+func (m *MicrophoneSource) ProcessData() <-chan data.Chunk {
+	chunks := make(chan data.Chunk)
+
+	go func() {
+		defer close(chunks)
+
+		const vadWindowSize = 512
+		const speechThreshold = float32(0.5)
+		const silenceLimit = 15
+
+		speechBuf := make([]float32, 0, 16000*30)
+		vadWindow := make([]float32, 0, vadWindowSize)
+		silenceCount := 0
+		inSpeech := false
+
+		for raw := range m.data {
+			resampled := Resample(raw)
+
+			for _, sample := range resampled {
+				vadWindow = append(vadWindow, sample)
+
+				if len(vadWindow) < vadWindowSize {
+					continue
+				}
+
+				window := make([]float32, len(vadWindow))
+				copy(window, vadWindow)
+				vadWindow = vadWindow[:0]
+
+				prob, err := m.vad.IsSpeech(window)
+				if err != nil {
+					continue
+				}
+
+				if prob >= speechThreshold {
+					inSpeech = true
+					silenceCount = 0
+					speechBuf = append(speechBuf, window...)
+				} else if inSpeech {
+					silenceCount++
+					speechBuf = append(speechBuf, window...)
+
+					if silenceCount >= silenceLimit {
+						snapshot := make([]float32, len(speechBuf))
+						copy(snapshot, speechBuf)
+						speechBuf = speechBuf[:0]
+						silenceCount = 0
+						inSpeech = false
+						m.vad.Reset()
+
+						chunk, err := m.extractor.Extract(snapshot)
+						if err != nil {
+							continue
+						}
+						chunks <- chunk
+					}
+				}
+			}
+		}
+	}()
+
+	return chunks
 }

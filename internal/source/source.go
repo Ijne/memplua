@@ -1,7 +1,9 @@
 package source
 
+import "crawler/internal/data"
+
 type Source interface {
 	Start() error
 	Stop() error
-	Data() <-chan []byte
+	ProcessData() <-chan data.Chunk
 }

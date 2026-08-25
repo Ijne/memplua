@@ -1,6 +1,10 @@
 package audio
 
 import (
+	"crawler/internal/config"
+	"crawler/internal/data"
+	"crawler/internal/models"
+	"crawler/models_storage"
 	"fmt"
 	"time"
 	"unsafe"
@@ -10,15 +14,28 @@ import (
 )
 
 func GetLoopbackSource() *LoopbackSource {
-	return &LoopbackSource{
-		stopChan: make(chan struct{}),
-		data:     make(chan []byte),
+	vad, err := models.NewSilero(models_storage.SILERO) // TODO: Handle error properly
+	if err != nil {
+		fmt.Printf("Error initializing VAD: %v\n", err)
+		return nil
 	}
+	extractor := models.NewWhisperExtractor()
+
+	mic := &LoopbackSource{
+		vad:       vad,
+		extractor: extractor,
+		stopChan:  make(chan struct{}),
+		data:      make(chan []byte),
+	}
+
+	return mic
 }
 
 type LoopbackSource struct {
-	stopChan chan struct{}
-	data     chan []byte
+	vad       models.VAD
+	extractor models.Extractor
+	stopChan  chan struct{}
+	data      chan []byte
 }
 
 func (m *LoopbackSource) Start() error {
@@ -67,7 +84,7 @@ func (m *LoopbackSource) Start() error {
 			select {
 			case <-m.stopChan:
 				return
-			case <-time.After(2 * time.Millisecond):
+			case <-time.After(time.Duration(config.SOUND_RECORDING_TICK) * time.Millisecond):
 				acc.GetBuffer(&data, &availableFrameSize, &flags, &devicePosition, &qcpPosition)
 
 				if availableFrameSize == 0 {
@@ -98,6 +115,62 @@ func (m *LoopbackSource) Stop() error {
 	return nil
 }
 
-func (m *LoopbackSource) Data() <-chan []byte {
-	return m.data
+func (m *LoopbackSource) ProcessData() <-chan data.Chunk {
+	chunks := make(chan data.Chunk)
+
+	tasks := make(chan []float32, 100) // TODO: configure buffer size based on expected load
+	go Worker(tasks, chunks, m.extractor)
+
+	go func() {
+		vadWindow := make([]float32, 0, config.VAD_SAMPLES)
+		buffer := make([]float32, 0, config.MIN_SOUND_BUFFER_SIZE)
+		ticker := time.NewTicker(time.Duration(config.SOUND_RECORDING_DURATION) * time.Second)
+
+		for {
+			select {
+			case raw := <-m.data:
+				samples := Resample(raw)
+				vadWindow = append(vadWindow, samples...)
+				for len(vadWindow) >= config.VAD_SAMPLES {
+					prob, err := m.vad.IsSpeech(vadWindow[:config.VAD_SAMPLES])
+					if err != nil {
+						fmt.Printf("Error occurred while checking VAD: %v\n", err)
+						continue
+					}
+
+					//fmt.Printf("VAD probability: %f\n", prob)
+					if prob > 0.00001 { // TODO: Handle speech detection logic here
+						buffer = append(buffer, vadWindow[:config.VAD_SAMPLES]...)
+					}
+
+					vadWindow = vadWindow[config.VAD_SAMPLES:]
+				}
+			case <-ticker.C:
+				if len(buffer) >= config.MIN_SOUND_BUFFER_SIZE {
+					now := time.Now()
+
+					var task = make([]float32, len(buffer))
+					copy(task, buffer)
+					tasks <- task
+
+					buffer = buffer[:0]
+					fmt.Printf("Processing required %f seconds\n", time.Since(now).Seconds())
+				}
+			}
+		}
+	}()
+
+	return chunks
+}
+
+func Worker(tasks <-chan []float32, chunks chan<- data.Chunk, extractor models.Extractor) {
+	for task := range tasks {
+		chunk, err := extractor.Extract(task)
+		if err != nil {
+			fmt.Printf("Error occurred while extracting features: %v\n", err)
+			continue
+		}
+		chunks <- chunk
+		task = nil // Clear the task to free memory
+	}
 }

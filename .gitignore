@@ -6,4 +6,6 @@
 *.gguf
 *.json
 *.txt
+*.onnx
+*.zip
 TODO

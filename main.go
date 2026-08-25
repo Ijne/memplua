@@ -14,7 +14,7 @@ func main() {
 	loopback := audio.GetLoopbackSource()
 
 	//micrpohone_chunks := pipeline.Stream(microphone, models.NewWhisperExtractor())
-	loopback_chunks := pipeline.Stream(loopback, whisperModel)
+	loopback_chunks := pipeline.Stream(loopback)
 	loopback_groups := pipeline.Grouper(pipeline.FWGrouper, loopback_chunks)
 	loopback_episodes := pipeline.Episoder(pipeline.SEEpisoder, loopback_groups)
 

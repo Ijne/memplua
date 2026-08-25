@@ -2,6 +2,10 @@ package pipeline
 
 import (
 	"crawler/internal/data"
+	"encoding/json"
+	"fmt"
+	"log"
+	"os"
 )
 
 var (
@@ -29,6 +33,7 @@ func (fw floatingWindow) groupChunks(chunks <-chan data.Chunk) <-chan []data.Chu
 				close(groups)
 				return
 			}
+			ChunkWriter(chunk)
 			cur_group = append(cur_group, chunk)
 			counter++
 			if counter >= fw.WindowSize/2 {
@@ -59,4 +64,21 @@ func Grouper(grouper_type string, chunks <-chan data.Chunk) <-chan []data.Chunk 
 	default:
 		return nil
 	}
+}
+
+func ChunkWriter(chunk data.Chunk) {
+	filename := fmt.Sprintf("chunks/%s.json", chunk.ID)
+
+	data, err := json.MarshalIndent(chunk, "", "    ")
+	if err != nil {
+		log.Printf("Writer: marshal error for %s: %v", chunk.ID, err)
+		return
+	}
+
+	if err := os.WriteFile(filename, data, 0644); err != nil {
+		log.Printf("Writer: write error for %s: %v", chunk.ID, err)
+		return
+	}
+
+	log.Printf("Writer: saved %s", filename)
 }
