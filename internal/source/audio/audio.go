@@ -1,7 +1,10 @@
 package audio
 
 import (
+	"crawler/internal/AI"
+	"crawler/internal/models"
 	"encoding/binary"
+	"fmt"
 	"math"
 )
 
@@ -27,4 +30,16 @@ func Resample(buf []byte) []float32 {
 	}
 
 	return resampled
+}
+
+func Worker(tasks <-chan []float32, chunks chan<- models.Chunk, extractor AI.Extractor) {
+	for task := range tasks {
+		chunk, err := extractor.Extract(task)
+		if err != nil {
+			fmt.Printf("Error occurred while extracting features: %v\n", err)
+			continue
+		}
+		chunks <- chunk
+		task = nil // Clear the task to free memory
+	}
 }

@@ -1,8 +1,8 @@
 package audio
 
 import (
+	"crawler/internal/AI"
 	"crawler/internal/config"
-	"crawler/internal/data"
 	"crawler/internal/models"
 	"crawler/models_storage"
 	"fmt"
@@ -14,12 +14,12 @@ import (
 )
 
 func GetLoopbackSource() *LoopbackSource {
-	vad, err := models.NewSilero(models_storage.SILERO) // TODO: Handle error properly
+	vad, err := AI.NewSilero(models_storage.SILERO) // TODO: Handle error properly
 	if err != nil {
 		fmt.Printf("Error initializing VAD: %v\n", err)
 		return nil
 	}
-	extractor := models.NewWhisperExtractor()
+	extractor := AI.NewWhisperExtractor()
 
 	mic := &LoopbackSource{
 		vad:       vad,
@@ -32,8 +32,8 @@ func GetLoopbackSource() *LoopbackSource {
 }
 
 type LoopbackSource struct {
-	vad       models.VAD
-	extractor models.Extractor
+	vad       AI.VAD
+	extractor AI.Extractor
 	stopChan  chan struct{}
 	data      chan []byte
 }
@@ -115,15 +115,15 @@ func (m *LoopbackSource) Stop() error {
 	return nil
 }
 
-func (m *LoopbackSource) ProcessData() <-chan data.Chunk {
-	chunks := make(chan data.Chunk)
+func (m *LoopbackSource) ProcessData() <-chan models.Chunk {
+	chunks := make(chan models.Chunk)
 
 	tasks := make(chan []float32, 100) // TODO: configure buffer size based on expected load
 	go Worker(tasks, chunks, m.extractor)
 
 	go func() {
 		vadWindow := make([]float32, 0, config.VAD_SAMPLES)
-		buffer := make([]float32, 0, config.MIN_SOUND_BUFFER_SIZE)
+		buffer := make([]float32, 0, config.SOUND_BUFFER_SIZE)
 		ticker := time.NewTicker(time.Duration(config.SOUND_RECORDING_DURATION) * time.Second)
 
 		for {
@@ -161,16 +161,4 @@ func (m *LoopbackSource) ProcessData() <-chan data.Chunk {
 	}()
 
 	return chunks
-}
-
-func Worker(tasks <-chan []float32, chunks chan<- data.Chunk, extractor models.Extractor) {
-	for task := range tasks {
-		chunk, err := extractor.Extract(task)
-		if err != nil {
-			fmt.Printf("Error occurred while extracting features: %v\n", err)
-			continue
-		}
-		chunks <- chunk
-		task = nil // Clear the task to free memory
-	}
 }

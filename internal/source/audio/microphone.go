@@ -1,8 +1,8 @@
 package audio
 
 import (
+	"crawler/internal/AI"
 	"crawler/internal/config"
-	"crawler/internal/data"
 	"crawler/internal/models"
 	"crawler/models_storage"
 	"fmt"
@@ -14,8 +14,8 @@ import (
 )
 
 func GetMicrophoneSource() *MicrophoneSource {
-	vad, _ := models.NewSilero(models_storage.SILERO) // TODO: Handle error properly
-	extractor := models.NewWhisperExtractor()
+	vad, _ := AI.NewSilero(models_storage.SILERO) // TODO: Handle error properly
+	extractor := AI.NewWhisperExtractor()
 
 	mic := &MicrophoneSource{
 		vad:       vad,
@@ -28,8 +28,8 @@ func GetMicrophoneSource() *MicrophoneSource {
 }
 
 type MicrophoneSource struct {
-	vad       models.VAD
-	extractor models.Extractor
+	vad       AI.VAD
+	extractor AI.Extractor
 	stopChan  chan struct{}
 	data      chan []byte
 }
@@ -115,62 +115,46 @@ func (m *MicrophoneSource) Stop() error {
 	return nil
 }
 
-func (m *MicrophoneSource) ProcessData() <-chan data.Chunk {
-	chunks := make(chan data.Chunk)
+func (m *MicrophoneSource) ProcessData() <-chan models.Chunk {
+	chunks := make(chan models.Chunk)
+
+	tasks := make(chan []float32, 100) // TODO: configure buffer size based on expected load
+	go Worker(tasks, chunks, m.extractor)
 
 	go func() {
-		defer close(chunks)
+		vadWindow := make([]float32, 0, config.VAD_SAMPLES)
+		buffer := make([]float32, 0, config.MIN_SOUND_BUFFER_SIZE)
+		ticker := time.NewTicker(time.Duration(config.SOUND_RECORDING_DURATION) * time.Second)
 
-		const vadWindowSize = 512
-		const speechThreshold = float32(0.5)
-		const silenceLimit = 15
-
-		speechBuf := make([]float32, 0, 16000*30)
-		vadWindow := make([]float32, 0, vadWindowSize)
-		silenceCount := 0
-		inSpeech := false
-
-		for raw := range m.data {
-			resampled := Resample(raw)
-
-			for _, sample := range resampled {
-				vadWindow = append(vadWindow, sample)
-
-				if len(vadWindow) < vadWindowSize {
-					continue
-				}
-
-				window := make([]float32, len(vadWindow))
-				copy(window, vadWindow)
-				vadWindow = vadWindow[:0]
-
-				prob, err := m.vad.IsSpeech(window)
-				if err != nil {
-					continue
-				}
-
-				if prob >= speechThreshold {
-					inSpeech = true
-					silenceCount = 0
-					speechBuf = append(speechBuf, window...)
-				} else if inSpeech {
-					silenceCount++
-					speechBuf = append(speechBuf, window...)
-
-					if silenceCount >= silenceLimit {
-						snapshot := make([]float32, len(speechBuf))
-						copy(snapshot, speechBuf)
-						speechBuf = speechBuf[:0]
-						silenceCount = 0
-						inSpeech = false
-						m.vad.Reset()
-
-						chunk, err := m.extractor.Extract(snapshot)
-						if err != nil {
-							continue
-						}
-						chunks <- chunk
+		for {
+			select {
+			case raw := <-m.data:
+				samples := Resample(raw)
+				vadWindow = append(vadWindow, samples...)
+				for len(vadWindow) >= config.VAD_SAMPLES {
+					prob, err := m.vad.IsSpeech(vadWindow[:config.VAD_SAMPLES])
+					if err != nil {
+						fmt.Printf("Error occurred while checking VAD: %v\n", err)
+						continue
 					}
+
+					//fmt.Printf("VAD probability: %f\n", prob)
+					if prob > 0.00001 { // TODO: Handle speech detection logic here
+						buffer = append(buffer, vadWindow[:config.VAD_SAMPLES]...)
+					}
+
+					vadWindow = vadWindow[config.VAD_SAMPLES:]
+				}
+			case <-ticker.C:
+				if len(buffer) >= config.MIN_SOUND_BUFFER_SIZE {
+					now := time.Now()
+
+					var task = make([]float32, len(buffer))
+					copy(task, buffer)
+					tasks <- task
+
+					buffer = buffer[:0]
+					fmt.Printf("Processing required %f seconds\n", time.Since(now).Seconds())
 				}
 			}
 		}

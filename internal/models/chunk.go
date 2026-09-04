@@ -1,4 +1,4 @@
-package data
+package models
 
 type Chunk struct {
 	ID        int64  `json:"id"`

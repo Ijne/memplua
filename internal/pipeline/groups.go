@@ -1,7 +1,7 @@
 package pipeline
 
 import (
-	"crawler/internal/data"
+	"crawler/internal/models"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -13,19 +13,19 @@ var (
 )
 
 type grouper interface {
-	groupChunks(chunks <-chan data.Chunk) (<-chan []data.Chunk, error)
+	groupChunks(chunks <-chan models.Chunk) (<-chan []models.Chunk, error)
 }
 
 type floatingWindow struct {
 	WindowSize int
 }
 
-func (fw floatingWindow) groupChunks(chunks <-chan data.Chunk) <-chan []data.Chunk {
-	groups := make(chan []data.Chunk)
+func (fw floatingWindow) groupChunks(chunks <-chan models.Chunk) <-chan []models.Chunk {
+	groups := make(chan []models.Chunk)
 
 	go func() {
-		cur_group := make([]data.Chunk, 0, fw.WindowSize)
-		next_group := make([]data.Chunk, 0, fw.WindowSize)
+		cur_group := make([]models.Chunk, 0, fw.WindowSize)
+		next_group := make([]models.Chunk, 0, fw.WindowSize)
 		counter := 0
 		for {
 			chunk, ok := <-chunks
@@ -40,7 +40,7 @@ func (fw floatingWindow) groupChunks(chunks <-chan data.Chunk) <-chan []data.Chu
 				next_group = append(next_group, chunk)
 			}
 			if counter == fw.WindowSize {
-				snapshot := make([]data.Chunk, len(cur_group))
+				snapshot := make([]models.Chunk, len(cur_group))
 				copy(snapshot, cur_group)
 				groups <- snapshot
 
@@ -56,17 +56,17 @@ func (fw floatingWindow) groupChunks(chunks <-chan data.Chunk) <-chan []data.Chu
 	return groups
 }
 
-func Grouper(grouper_type string, chunks <-chan data.Chunk) <-chan []data.Chunk {
+func Grouper(grouper_type string, chunks <-chan models.Chunk) <-chan []models.Chunk {
 	switch grouper_type {
 	case FWGrouper:
-		fw := floatingWindow{WindowSize: 5}
+		fw := floatingWindow{WindowSize: 20}
 		return fw.groupChunks(chunks)
 	default:
 		return nil
 	}
 }
 
-func ChunkWriter(chunk data.Chunk) {
+func ChunkWriter(chunk models.Chunk) {
 	filename := fmt.Sprintf("chunks/%s.json", chunk.ID)
 
 	data, err := json.MarshalIndent(chunk, "", "    ")

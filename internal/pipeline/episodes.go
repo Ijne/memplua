@@ -1,7 +1,7 @@
 package pipeline
 
 import (
-	"crawler/internal/data"
+	"crawler/internal/AI"
 	"crawler/internal/models"
 	"fmt"
 	"log"
@@ -12,16 +12,16 @@ var (
 )
 
 type episoder interface {
-	episodes(groups <-chan []data.Chunk) <-chan data.Episode
+	episodes(groups <-chan []models.Chunk) <-chan models.Episode
 }
 
 // SimpleEpisoder | Info: A simple implementation of the Episoder interface that creates episodes from groups of chunks.
 type simpleEpisoder struct {
-	LLM models.LLM
+	LLM AI.LLM
 }
 
-func (se simpleEpisoder) episodes(groups <-chan []data.Chunk) <-chan data.Episode {
-	episodes := make(chan data.Episode)
+func (se simpleEpisoder) episodes(groups <-chan []models.Chunk) <-chan models.Episode {
+	episodes := make(chan models.Episode)
 
 	go func() {
 		for {
@@ -47,7 +47,7 @@ func (se simpleEpisoder) episodes(groups <-chan []data.Chunk) <-chan data.Episod
 	return episodes
 }
 
-func ChunksIDs(chunks []data.Chunk) []int64 {
+func ChunksIDs(chunks []models.Chunk) []int64 {
 	ids := make([]int64, len(chunks))
 	for i, chunk := range chunks {
 		ids[i] = chunk.ID
@@ -55,10 +55,10 @@ func ChunksIDs(chunks []data.Chunk) []int64 {
 	return ids
 }
 
-func Episoder(episoder_type string, groups <-chan []data.Chunk) <-chan data.Episode {
+func Episoder(episoder_type string, groups <-chan []models.Chunk) <-chan models.Episode {
 	switch episoder_type {
 	case SEEpisoder:
-		se := simpleEpisoder{LLM: models.NewLlamaClient("http://localhost:8080", "Qwen3-4B-Q4_K_M")}
+		se := simpleEpisoder{LLM: AI.NewLlamaClient("http://localhost:8080", "Qwen3-4B-Q4_K_M")}
 		return se.episodes(groups)
 	default:
 		return nil

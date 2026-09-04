@@ -1,4 +1,4 @@
-package models
+package AI
 
 const (
 	VADTypeSilero = "silero"

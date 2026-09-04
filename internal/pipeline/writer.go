@@ -1,14 +1,14 @@
 package pipeline
 
 import (
-	"crawler/internal/data"
+	"crawler/internal/models"
 	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 )
 
-func Writer(episodes <-chan data.Episode) {
+func Writer(episodes <-chan models.Episode) {
 	for episode := range episodes {
 		filename := fmt.Sprintf("episodes/%s.json", episode.ID)
 

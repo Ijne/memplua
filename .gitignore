@@ -8,4 +8,9 @@
 *.txt
 *.onnx
 *.zip
+*.mp3
+*.excalidraw
+/obsidian
+/docs
+/models_storage/lora
 TODO

@@ -1,9 +1,9 @@
 package source
 
-import "crawler/internal/data"
+import "crawler/internal/models"
 
 type Source interface {
 	Start() error
 	Stop() error
-	ProcessData() <-chan data.Chunk
+	ProcessData() <-chan models.Chunk
 }
