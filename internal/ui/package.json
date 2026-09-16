@@ -1,0 +1,10 @@
+{
+  "name": "knowledgecrawler-ui-tests",
+  "private": true,
+  "scripts": {
+    "test": "node --test review.test.cjs"
+  },
+  "devDependencies": {
+    "jsdom": "^29.1.1"
+  }
+}

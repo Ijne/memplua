@@ -1,0 +1,913 @@
+openapi: 3.1.0
+info:
+  title: KnowledgeCrawler Local API
+  version: 1.0.0
+  description: Loopback-only REST/SSE API. Desktop clients send X-KnowledgeCrawler-Client=desktop for safe localized error codes; the developer UI contracts remain available. Every API endpoint except /healthz requires the local bearer token.
+servers:
+  - url: http://127.0.0.1:7331
+security:
+  - bearerAuth: []
+paths:
+  /ui/:
+    get:
+      security: []
+      operationId: controlPanel
+      responses:
+        "200":
+          description: Embedded local control panel. Data requests from the panel still require the bearer token.
+          content:
+            text/html:
+              schema: { type: string }
+  /healthz:
+    get:
+      security: []
+      operationId: health
+      responses:
+        "200":
+          description: Process is accepting HTTP requests.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { const: ok }
+  /api/v1/ui/state:
+    get:
+      operationId: getDesktopState
+      responses:
+        "200":
+          description: Compact user-facing status, without raw errors, job details or queue sizes. Sources start off on every application launch.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DesktopState" }
+  /api/v1/status:
+    get:
+      operationId: getStatus
+      responses:
+        "200":
+          description: Application, component, source, and queue status.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApplicationStatus" }
+  /api/v1/sources:
+    get:
+      operationId: listSources
+      responses:
+        "200":
+          description: Source descriptors and persisted sessions.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sources, sessions]
+                properties:
+                  sources:
+                    type: array
+                    items: { $ref: "#/components/schemas/SourceDescriptor" }
+                  sessions:
+                    type: array
+                    items: { $ref: "#/components/schemas/SourceSession" }
+  /api/v1/sources/{id}/start:
+    post:
+      operationId: startSource
+      parameters:
+        - $ref: "#/components/parameters/ResourceID"
+      responses:
+        "202":
+          description: Source session accepted.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SourceSession" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/source-sessions/{id}/pause:
+    post:
+      operationId: pauseSourceSession
+      parameters:
+        - $ref: "#/components/parameters/ResourceID"
+      responses:
+        "204": { description: Session paused. }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/source-sessions/{id}/resume:
+    post:
+      operationId: resumeSourceSession
+      parameters:
+        - $ref: "#/components/parameters/ResourceID"
+      responses:
+        "202":
+          description: Existing session resumed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SourceSession" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/source-sessions/{id}/stop:
+    post:
+      operationId: stopSourceSession
+      parameters:
+        - $ref: "#/components/parameters/ResourceID"
+      responses:
+        "204": { description: Session stopped. }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/ingest/text:
+    post:
+      operationId: submitManualText
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [text]
+              properties:
+                text: { type: string, minLength: 1, maxLength: 250000 }
+      responses:
+        "202":
+          description: Text was persisted as a chunk and durable grouping was queued.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TextSubmission" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /api/v1/source-sessions/{id}/finalize:
+    post:
+      operationId: finalizeSourceSession
+      parameters:
+        - $ref: "#/components/parameters/ResourceID"
+      responses:
+        "204":
+          description: Idempotently close the collecting batch; capture continues.
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/review/conspects:
+    get:
+      operationId: listReviewConspects
+      parameters:
+        - $ref: "#/components/parameters/DesktopView"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Oldest first conspects. view=desktop returns compact summaries; omitted view preserves the developer contract.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - { type: array, items: { $ref: "#/components/schemas/ReviewConspect" } }
+                  - { type: array, items: { $ref: "#/components/schemas/DesktopConspectSummary" } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/review/conspects/{id}:
+    get:
+      operationId: getReviewConspect
+      parameters:
+        - $ref: "#/components/parameters/DesktopView"
+        - $ref: "#/components/parameters/ResourceID"
+      responses:
+        "200":
+          description: Structured candidates, matches, decisions and taxonomy.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - { $ref: "#/components/schemas/ReviewConspect" }
+                  - { $ref: "#/components/schemas/DesktopConspectDetail" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/review/conspects/{id}/source-text:
+    get:
+      operationId: getConspectSourceText
+      parameters:
+        - $ref: "#/components/parameters/ResourceID"
+      responses:
+        "200":
+          description: Full immutable focus text in sequence order. No technical IDs, raw JSON, model responses or context tail.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConspectSourceText" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/review/conspects/{id}/chunks:
+    get:
+      operationId: getConspectEvidence
+      parameters:
+        - $ref: "#/components/parameters/ResourceID"
+      responses:
+        "200":
+          description: Original evidence chunks.
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Chunk" } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/review/items/{id}:
+    put:
+      operationId: saveReviewDecision
+      parameters:
+        - $ref: "#/components/parameters/ResourceID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReviewDecision" }
+      responses:
+        "204":
+          description: Save a decision without changing the canonical graph.
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/review/items/{id}/split:
+    post:
+      operationId: splitReviewVariants
+      parameters:
+        - $ref: "#/components/parameters/ResourceID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SplitReviewItem" }
+      responses:
+        "204":
+          description: Move a proper subset of incoming variants into another review item.
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/review/taxonomy/{id}:
+    put:
+      operationId: resolveReviewTaxonomy
+      parameters:
+        - $ref: "#/components/parameters/ResourceID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TaxonomyDecision" }
+      responses:
+        "204":
+          description: Resolve a unique unknown label without changing taxonomy.
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/review/conspects/{id}/apply:
+    post:
+      operationId: applyConspect
+      parameters:
+        - $ref: "#/components/parameters/ResourceID"
+      responses:
+        "204":
+          description: Atomically apply all resolved items, taxonomy, links, provenance, one graph revision and one export job. Repeated application is a no-op; a version conflict rolls back and queues rematching.
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/graph/search:
+    get:
+      operationId: searchCanonicalGraph
+      parameters:
+        - name: kind
+          in: query
+          required: true
+          schema: { enum: [term, thought] }
+        - name: q
+          in: query
+          schema: { type: string }
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Search the complete canonical graph by normalized title or body.
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/ReviewMatch" } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/developer/analysis-batches:
+    get:
+      operationId: listAnalysisBatches
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Developer diagnostics including raw and normalized responses.
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/AnalysisBatch" } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/developer/analysis-batches/{id}:
+    get:
+      operationId: getAnalysisBatch
+      parameters:
+        - $ref: "#/components/parameters/ResourceID"
+      responses:
+        "200":
+          description: Developer diagnostics and original focus/context fragments.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AnalysisBatch" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/graph:
+    get:
+      operationId: getKnowledgeGraph
+      responses:
+        "200":
+          description: Read-only canonical graph snapshot.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GraphSnapshot" }
+  /api/v1/graph/terms:
+    get:
+      operationId: listTerms
+      responses:
+        "200":
+          description: Canonical terms.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Term" }
+  /api/v1/graph/thoughts:
+    get:
+      operationId: listThoughts
+      responses:
+        "200":
+          description: Canonical thoughts.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Thought" }
+  /api/v1/jobs:
+    get:
+      operationId: listJobs
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - name: status
+          in: query
+          schema: { enum: [queued, running, retry, done, failed] }
+      responses:
+        "200":
+          description: Durable processing jobs, optionally filtered by status.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Job" }
+  /api/v1/taxonomy/{kind}:
+    get:
+      operationId: listTaxonomy
+      parameters:
+        - name: kind
+          in: path
+          required: true
+          schema: { enum: [tag] }
+      responses:
+        "200":
+          description: Enabled system and user taxonomy with aliases.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TaxonomyEntry" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /api/v1/jobs/{id}/retry:
+    post:
+      operationId: retryFailedJob
+      parameters:
+        - $ref: "#/components/parameters/ResourceID"
+      responses:
+        "202": { description: Failed job returned to the queue. }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/notifications:
+    get:
+      operationId: listNotifications
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - name: after_id
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Durable user-event history.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AppEvent" }
+  /api/v1/notifications/{id}/read:
+    post:
+      operationId: markNotificationRead
+      parameters:
+        - $ref: "#/components/parameters/ResourceID"
+      responses:
+        "204": { description: Notification marked as read. }
+  /api/v1/events:
+    get:
+      operationId: streamEvents
+      parameters:
+        - $ref: "#/components/parameters/DesktopView"
+        - name: Last-Event-ID
+          in: header
+          schema: { type: string }
+      responses:
+        "200":
+          description: SSE stream with durable replay after Last-Event-ID. view=desktop sends event=user frames with UserEvent data and checkpoint-only frames for developer events. Reconnect clients re-fetch ui/state to reconcile current counters.
+          content:
+            text/event-stream:
+              schema: { type: string }
+  /api/v1/settings:
+    get:
+      operationId: getSettings
+      responses:
+        "200": { description: Effective settings with the inline token omitted. }
+    patch:
+      operationId: updateSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SettingsPatch" }
+      responses:
+        "200":
+          description: Persisted effective settings. Only changed settings whose runtime dependencies need recreation are returned in restart_keys; UI preferences and conspect language apply live.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [settings, restart_required, restart_keys]
+                properties:
+                  settings: { type: object, additionalProperties: true }
+                  restart_required: { type: boolean }
+                  restart_keys: { type: array, items: { type: string } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /api/v1/exports/obsidian:
+    post:
+      operationId: exportObsidian
+      responses:
+        "202": { description: Export job queued. }
+  /api/v1/application/shutdown:
+    post:
+      operationId: shutdownApplication
+      responses:
+        "202": { description: Graceful shutdown requested. }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    DesktopView:
+      name: view
+      in: query
+      schema: { enum: [desktop] }
+      description: Opt into compact desktop contracts while preserving developer clients.
+    ResourceID:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 500 }
+  responses:
+    BadRequest:
+      description: Invalid request.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Conflict:
+      description: State conflict or validation failure.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+        code: { type: string, description: Stable localization code for desktop clients. }
+        params: { type: object, additionalProperties: true }
+        audience: { const: user }
+    QueueStats:
+      type: object
+      required: [queued, running, retry, failed]
+      properties:
+        queued: { type: integer }
+        running: { type: integer }
+        retry: { type: integer }
+        failed: { type: integer }
+    TextSubmission:
+      type: object
+      required: [source_session_id, chunk_id, created_at]
+      properties:
+        source_session_id: { type: string }
+        chunk_id: { type: string }
+        created_at: { type: string, format: date-time }
+    ApplicationStatus:
+      type: object
+      required: [run_id, version, state, started_at, queues, pending_review_conspects, components, sources, sessions]
+      properties:
+        run_id: { type: string }
+        version: { type: string }
+        state: { enum: [starting, running, paused, degraded, stopping, stopped] }
+        started_at: { type: string, format: date-time }
+        queues: { $ref: "#/components/schemas/QueueStats" }
+        pending_review_conspects: { type: integer }
+        components: { type: object, additionalProperties: true }
+        sources:
+          type: array
+          items: { $ref: "#/components/schemas/SourceDescriptor" }
+        sessions:
+          type: array
+          items: { $ref: "#/components/schemas/SourceSession" }
+    SourceDescriptor:
+      type: object
+      required: [id, kind, available]
+      properties:
+        id: { type: string }
+        kind: { type: string }
+        available: { type: boolean }
+        reason: { type: string }
+    SourceSession:
+      type: object
+      required: [id, source_id, kind, state, started_at]
+      properties:
+        id: { type: string }
+        source_id: { type: string }
+        kind: { type: string }
+        state: { enum: [starting, running, paused, stopped, failed] }
+        started_at: { type: string, format: date-time }
+        stopped_at: { type: string, format: date-time }
+        last_error: { type: string }
+    ReviewValue:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string }
+        description: { type: string }
+        thesis: { type: string }
+        body: { type: string }
+        tags: { type: [array, 'null'], items: { type: string } }
+      description: Term values use name/description/tags; thought values use thesis/body/tags. IDs, versions, and arbitrary fields cannot be edited here.
+    Provenance:
+      type: object
+      required: [evidence_chunk_ids, anchor_chunk_id]
+      properties:
+        evidence_chunk_ids: { type: array, items: { type: string } }
+        anchor_chunk_id: { type: string }
+    IncomingVariant:
+      allOf:
+        - $ref: "#/components/schemas/Provenance"
+        - type: object
+          required: [candidate_id, value]
+          properties:
+            candidate_id: { type: string }
+            value: { $ref: "#/components/schemas/ReviewValue" }
+            related_term_refs: { type: array, items: { type: string } }
+    ReviewMatch:
+      type: object
+      required: [id, kind, source, version, value, score, exact]
+      properties:
+        id: { type: string }
+        kind: { enum: [term, thought] }
+        source: { enum: [canonical, pending] }
+        conspect_id: { type: string }
+        version: { type: integer }
+        score: { type: number, minimum: 0, maximum: 1 }
+        exact: { type: boolean }
+        value: { $ref: "#/components/schemas/ReviewValue" }
+    ReviewItem:
+      type: object
+      required: [id, conspect_id, kind, incoming_variants, canonical_matches, pending_matches, resolution, target_version, final_value, status]
+      properties:
+        id: { type: string }
+        conspect_id: { type: string }
+        kind: { enum: [term, thought] }
+        incoming_variants: { type: array, items: { $ref: "#/components/schemas/IncomingVariant" } }
+        canonical_matches: { type: array, maxItems: 5, items: { $ref: "#/components/schemas/ReviewMatch" } }
+        pending_matches: { type: array, maxItems: 5, items: { $ref: "#/components/schemas/ReviewMatch" } }
+        resolution: { enum: ['', create, update, keep_existing, reject] }
+        target_id: { type: string }
+        target_version: { type: integer }
+        final_value: { $ref: "#/components/schemas/ReviewValue" }
+        related_item_ids: { type: array, uniqueItems: true, items: { type: string }, description: Review term item IDs connected to this thought. Empty for terms. }
+        status: { enum: [pending, resolved, applied, failed] }
+    ReviewDecision:
+      type: object
+      additionalProperties: false
+      required: [resolution]
+      properties:
+        resolution: { enum: [create, update, keep_existing, reject] }
+        target_id: { type: string, description: Required for update/keep_existing. }
+        target_version: { type: integer, description: Required current version for update/keep_existing. }
+        final_value: { $ref: "#/components/schemas/ReviewValue" }
+        related_item_ids: { type: array, uniqueItems: true, items: { type: string }, description: Complete set of review term item IDs connected to a thought. Valid only for thought decisions. }
+      description: When final_value is omitted for update, use the current canonical value. Keep_existing always preserves the canonical value. An exact normalized title match must be kept or updated and cannot be deselected. A thought cannot be accepted while a related term is rejected.
+    SplitReviewItem:
+      type: object
+      additionalProperties: false
+      required: [variant_ids]
+      properties:
+        variant_ids: { type: array, minItems: 1, uniqueItems: true, items: { type: string } }
+    TaxonomyDecision:
+      type: object
+      additionalProperties: false
+      required: [resolution]
+      properties:
+        resolution: { enum: [map, create, remove] }
+        target_id: { type: string, description: Required only for map. }
+        value:
+          type: string
+          minLength: 1
+          description: Optional edited label for create. Server normalizes it, maps canonical names/aliases, merges duplicate draft labels and updates draft entity tags atomically. An omitted value preserves the proposed name.
+    ReviewTaxonomyResolution:
+      type: object
+      properties:
+        id: { type: string }
+        conspect_id: { type: string }
+        kind: { enum: [tag] }
+        value: { type: string }
+        resolution: { enum: ['', map, create, remove] }
+        target_id: { type: string }
+        required: { type: boolean }
+    TermCandidate:
+      allOf:
+        - $ref: "#/components/schemas/Provenance"
+        - type: object
+          properties:
+            id: { type: string }
+            ref: { type: string }
+            name: { type: string }
+            description: { type: string }
+            tags: { type: array, items: { type: string } }
+    ThoughtCandidate:
+      allOf:
+        - $ref: "#/components/schemas/Provenance"
+        - type: object
+          properties:
+            id: { type: string }
+            thesis: { type: string }
+            body: { type: string }
+            tags: { type: array, items: { type: string } }
+            related_term_refs: { type: array, items: { type: string } }
+    ReviewConspect:
+      type: object
+      required: [id, analysis_batch_id, source_session_id, topic, created_at, status, terms, thoughts, items, taxonomy]
+      properties:
+        id: { type: string }
+        analysis_batch_id: { type: string }
+        source_session_id: { type: string }
+        topic: { type: string }
+        created_at: { type: string, format: date-time }
+        status: { enum: [preparing_review, review_pending, ready_to_apply, applied, rejected, failed] }
+        terms: { type: array, items: { $ref: "#/components/schemas/TermCandidate" } }
+        thoughts: { type: array, items: { $ref: "#/components/schemas/ThoughtCandidate" } }
+        items: { type: array, items: { $ref: "#/components/schemas/ReviewItem" } }
+        taxonomy: { type: array, items: { $ref: "#/components/schemas/ReviewTaxonomyResolution" } }
+    Chunk:
+      type: object
+      properties:
+        id: { type: string }
+        source_session_id: { type: string }
+        sequence: { type: integer }
+        captured_at: { type: string, format: date-time }
+        text: { type: string }
+        status: { enum: [ready, failed] }
+    AnalysisBatch:
+      type: object
+      properties:
+        id: { type: string }
+        source_session_id: { type: string }
+        status: { enum: [collecting, ready, extracting, extracted, failed] }
+        started_at: { type: string, format: date-time }
+        last_text_at: { type: string, format: date-time }
+        closed_at: { type: string, format: date-time }
+        close_reason: { type: string }
+        input:
+          type: object
+          properties:
+            context: { type: array, items: { $ref: "#/components/schemas/Chunk" } }
+            focus: { type: array, items: { $ref: "#/components/schemas/Chunk" } }
+        raw_model_response: { type: string }
+        normalized_response: { type: string }
+        model: { type: string }
+        prompt_version: { type: string }
+        last_error: { type: string }
+    Term:
+      type: object
+      required: [id, name, description, tags, version, created_at, updated_at]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        tags: { type: array, items: { type: string } }
+        version: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    Thought:
+      type: object
+      required: [id, thesis, body, tags, version, created_at, updated_at]
+      properties:
+        id: { type: string }
+        thesis: { type: string }
+        body: { type: string }
+        tags: { type: array, items: { type: string } }
+        version: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    ThoughtTerm:
+      type: object
+      required: [id, thought_id, term_id, created_at]
+      properties:
+        id: { type: string }
+        thought_id: { type: string }
+        term_id: { type: string }
+        created_at: { type: string, format: date-time }
+    GraphSnapshot:
+      type: object
+      required: [revision, terms, thoughts, links]
+      properties:
+        revision: { type: integer }
+        terms: { type: array, items: { $ref: "#/components/schemas/Term" } }
+        thoughts: { type: array, items: { $ref: "#/components/schemas/Thought" } }
+        links: { type: array, items: { $ref: "#/components/schemas/ThoughtTerm" } }
+    Job:
+      type: object
+      required: [id, kind, payload, status, attempts, available_at]
+      properties:
+        id: { type: string }
+        kind: { enum: [extract_analysis_batch, prepare_conspect_review, export] }
+        payload: {}
+        status: { enum: [queued, running, retry, done, failed] }
+        attempts: { type: integer }
+        available_at: { type: string, format: date-time }
+        lease_owner: { type: string }
+        lease_until: { type: string, format: date-time }
+        last_error: { type: string }
+    AppEvent:
+      type: object
+      required: [id, time, severity, type, message, read]
+      properties:
+        id: { type: string }
+        time: { type: string, format: date-time }
+        severity: { enum: [info, warning, error] }
+        type: { type: string }
+        message: { type: string }
+        resource_kind: { type: string }
+        resource_id: { type: string }
+        data: { type: object, additionalProperties: true }
+        read: { type: boolean }
+    TaxonomyEntry:
+      type: object
+      required: [id, kind, name, aliases, system, enabled, created_at]
+      properties:
+        id: { type: string }
+        kind: { enum: [tag] }
+        name: { type: string }
+        aliases: { type: array, items: { type: string } }
+        system: { type: boolean }
+        enabled: { type: boolean }
+        created_at: { type: string, format: date-time }
+    SettingsPatch:
+      type: object
+      additionalProperties: false
+      properties:
+        ui_language: { enum: [ru, en] }
+        conspect_language: { enum: [ru, en] }
+        theme: { enum: [system, light, dark] }
+        ui_theme: { enum: [system, light, dark], deprecated: true }
+        always_on_top: { type: boolean }
+        start_with_windows: { type: boolean }
+        language: { type: string }
+        log_level: { enum: [debug, info, warn, error] }
+        processing_limit: { type: integer, minimum: 1 }
+        review_limit: { type: integer, minimum: 1 }
+        obsidian_directory: { type: string }
+        auto_export: { type: boolean }
+        models_managed: { type: boolean }
+        llama_binary: { type: string }
+        llm_model: { type: string }
+        llm_url: { type: string, format: uri }
+        model_parallel: { type: integer, minimum: 1 }
+        model_gpu_layers: { type: integer, minimum: 0 }
+        llama_server_args:
+          type: array
+          items: { type: string, minLength: 1 }
+        whisper_model: { type: string }
+        silero_model: { type: string }
+        onnx_runtime: { type: string }
+
+    UserAction:
+      type: object
+      required: [type]
+      properties:
+        type: { const: open_window }
+        target: { enum: [settings, review] }
+    UserEvent:
+      type: object
+      additionalProperties: false
+      required: [time, severity, code, params, audience]
+      properties:
+        id: { type: string, description: Durable replay cursor when available. }
+        time: { type: string, format: date-time }
+        severity: { enum: [info, warning, error] }
+        code: { type: string, description: Stable localization key; raw developer messages are never included. }
+        params: { type: object, additionalProperties: true }
+        audience: { const: user }
+        action: { $ref: "#/components/schemas/UserAction" }
+    DesktopState:
+      type: object
+      additionalProperties: false
+      required: [application, sources, processing, pending_conspects, pending_items]
+      properties:
+        application: { enum: [starting, running, paused, degraded, stopping, stopped] }
+        sources:
+          type: array
+          items:
+            type: object
+            required: [id, kind, available, state, actions]
+            properties:
+              id: { type: string }
+              kind: { type: string }
+              available: { type: boolean }
+              state: { enum: [off, starting, recording, paused, failed] }
+              session_id: { type: string, description: Opaque command handle; never shown to users. }
+              actions: { type: array, items: { enum: [start, pause, resume, stop] } }
+              code: { type: string }
+              started_at: { type: string, format: date-time, description: Start of the current source session, used for elapsed time. }
+              stopped_at: { type: string, format: date-time, description: Pause or stop time when the session is not running. }
+        processing: { enum: [idle, working, retrying, paused, failed] }
+        pending_conspects: { type: integer, minimum: 0 }
+        pending_items: { type: integer, minimum: 0 }
+        warning: { $ref: "#/components/schemas/UserEvent" }
+    DesktopConspectSummary:
+      type: object
+      required: [id, topic, created_at, status, source_kind, item_count, unresolved_items, unresolved_tags]
+      properties:
+        id: { type: string }
+        topic: { type: string }
+        created_at: { type: string, format: date-time }
+        status: { enum: [preparing_review, review_pending, ready_to_apply, applied, rejected, failed] }
+        source_kind: { type: string }
+        item_count: { type: integer, minimum: 0 }
+        unresolved_items: { type: integer, minimum: 0 }
+        unresolved_tags: { type: integer, minimum: 0 }
+    DesktopConspectDetail:
+      allOf:
+        - $ref: "#/components/schemas/DesktopConspectSummary"
+        - type: object
+          required: [items, taxonomy]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/DesktopReviewItem" } }
+            taxonomy: { type: array, items: { $ref: "#/components/schemas/ReviewTaxonomyResolution" } }
+    DesktopReviewItem:
+      type: object
+      properties:
+        id: { type: string }
+        conspect_id: { type: string }
+        kind: { enum: [term, thought] }
+        incoming_variants:
+          type: array
+          items:
+            type: object
+            required: [candidate_id, value, related_terms]
+            properties:
+              candidate_id: { type: string }
+              value: { $ref: "#/components/schemas/ReviewValue" }
+              related_terms: { type: array, items: { type: string }, description: Human-readable names; read-only. }
+        canonical_matches: { type: array, items: { $ref: "#/components/schemas/DesktopReviewMatch" } }
+        pending_matches: { type: array, items: { $ref: "#/components/schemas/DesktopReviewMatch" } }
+        resolution: { enum: ['', create, update, keep_existing, reject] }
+        target_id: { type: string }
+        target_version: { type: integer }
+        final_value: { $ref: "#/components/schemas/ReviewValue" }
+        related_item_ids: { type: array, uniqueItems: true, items: { type: string }, description: Review term item IDs connected to this thought. Empty for terms. }
+        status: { enum: [pending, resolved, applied, failed] }
+    DesktopReviewMatch:
+      type: object
+      properties:
+        id: { type: string }
+        kind: { enum: [term, thought] }
+        source: { enum: [canonical, pending] }
+        conspect_id: { type: string }
+        version: { type: integer }
+        exact: { type: boolean }
+        value: { $ref: "#/components/schemas/ReviewValue" }
+    ConspectSourceText:
+      type: object
+      additionalProperties: false
+      required: [text, source_kind, started_at, ended_at]
+      properties:
+        text: { type: string }
+        source_kind: { type: string }
+        started_at: { type: string, format: date-time }
+        ended_at: { type: string, format: date-time }

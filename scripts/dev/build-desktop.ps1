@@ -1,0 +1,68 @@
+param(
+    [switch]$Native,
+    [switch]$CoreOnly,
+    [string]$WhisperRoot = "",
+    [ValidateSet("Release", "Debug")]
+    [string]$Configuration = "Release",
+    [string]$Output = "knowledgecrawler.exe",
+    [switch]$SkipFrontend
+)
+
+$ErrorActionPreference = "Stop"
+$ProjectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "../.."))
+$FrontendRoot = Join-Path $ProjectRoot "frontend/desktop"
+
+if ($Native -and $CoreOnly) {
+    throw "-Native and -CoreOnly cannot be used together"
+}
+if (-not $WhisperRoot -and $env:KNOWLEDGECRAWLER_WHISPER_ROOT) {
+    $WhisperRoot = $env:KNOWLEDGECRAWLER_WHISPER_ROOT
+}
+if (-not $WhisperRoot) {
+    $WhisperCandidate = [IO.Path]::GetFullPath((Join-Path $ProjectRoot "../../whisper.cpp"))
+    if (Test-Path -LiteralPath (Join-Path $WhisperCandidate "include/whisper.h") -PathType Leaf) {
+        $WhisperRoot = $WhisperCandidate
+    }
+}
+if (-not $CoreOnly -and $WhisperRoot) {
+    $Native = $true
+}
+
+if ($Native) {
+    if ([string]::IsNullOrWhiteSpace($WhisperRoot)) {
+        throw "-Native requires -WhisperRoot or KNOWLEDGECRAWLER_WHISPER_ROOT pointing to the external Whisper build."
+    }
+    . (Join-Path $PSScriptRoot "native-env.ps1") -WhisperRoot $WhisperRoot -Configuration $Configuration
+    Write-Output "Native audio: enabled ($WhisperRoot)"
+} else {
+    Write-Warning "Native audio is disabled. microphone and loopback will be unavailable; provide -WhisperRoot or KNOWLEDGECRAWLER_WHISPER_ROOT, or omit -CoreOnly."
+}
+
+if (-not $SkipFrontend) {
+    Push-Location $FrontendRoot
+    try {
+        npm.cmd ci
+        if ($LASTEXITCODE -ne 0) { throw "npm ci failed with exit code $LASTEXITCODE" }
+        npm.cmd run build
+        if ($LASTEXITCODE -ne 0) { throw "frontend build failed with exit code $LASTEXITCODE" }
+    } finally { Pop-Location }
+}
+
+$DesktopIndex = Join-Path $ProjectRoot "internal/desktop/assets/index.html"
+if (-not (Test-Path -LiteralPath $DesktopIndex)) { throw "Build the desktop frontend before compiling Go." }
+if ((Get-Content -LiteralPath $DesktopIndex -Raw) -notmatch '<script[^>]+src=') {
+    throw "Desktop assets are a placeholder. Run this script without -SkipFrontend."
+}
+
+$BuildTags = "desktop,production"
+if ($Native) { $BuildTags += ",native" }
+Push-Location $ProjectRoot
+try {
+    # Preserve the existing native-env.ps1 Whisper linking configuration.
+    # The release subsystem avoids a console window for ordinary desktop launch.
+    $BuildArguments = @("build", "-tags", $BuildTags, "-o", $Output)
+    if ($Configuration -eq "Release") { $BuildArguments += @("-trimpath", "-ldflags", "-H windowsgui") }
+    $BuildArguments += "./cmd/knowledgecrawler"
+    & go @BuildArguments
+    if ($LASTEXITCODE -ne 0) { throw "desktop build failed with exit code $LASTEXITCODE" }
+} finally { Pop-Location }

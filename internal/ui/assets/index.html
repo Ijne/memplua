@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>KnowledgeCrawler</title>
+  <link rel="stylesheet" href="/ui/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="/ui/" aria-label="KnowledgeCrawler">
+        <span class="brand-mark">KC</span>
+        <span><strong>Knowledge</strong><small>Crawler</small></span>
+      </a>
+
+      <nav class="navigation" aria-label="Основная навигация">
+        <button class="nav-item is-active" data-view="overview"><span>⌂</span>Обзор</button>
+        <button class="nav-item" data-view="sources"><span>◉</span>Источники</button>
+        <button class="nav-item" data-view="review"><span>✓</span>Review <b id="reviewBadge" class="badge is-hidden">0</b></button>
+        <button class="nav-item" data-view="knowledge"><span>⌘</span>Граф знаний</button>
+        <button class="nav-item" data-view="jobs"><span>↻</span>Очередь</button>
+        <button class="nav-item" data-view="events"><span>◌</span>События <b id="eventBadge" class="badge is-hidden">0</b></button>
+        <button class="nav-item" data-view="settings"><span>⚙</span>Настройки</button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="connection-state">
+          <i id="connectionDot" class="status-dot offline"></i>
+          <span id="connectionText">Не подключено</span>
+        </div>
+        <button id="changeToken" class="text-button">Сменить API token</button>
+        <small id="uiVersion">KnowledgeCrawler</small>
+      </div>
+    </aside>
+
+    <div class="workspace">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Локальная система знаний</p>
+          <h1 id="viewTitle">Обзор</h1>
+        </div>
+        <div class="topbar-actions">
+          <span id="appState" class="state-pill neutral">unknown</span>
+          <button id="refreshCurrent" class="icon-button" title="Обновить" aria-label="Обновить">↻</button>
+        </div>
+      </header>
+
+      <main>
+        <section id="view-overview" class="view is-active">
+          <div class="hero card">
+            <div>
+              <span class="kicker">CONTROL CENTER</span>
+              <h2>Превращайте поток информации в проверяемые знания</h2>
+              <p>Запустите источник или отправьте текст вручную. Любое изменение графа появится в review до записи в эталонную базу.</p>
+            </div>
+            <button class="primary" data-go="sources">Добавить данные <span>→</span></button>
+          </div>
+
+          <div class="metrics" aria-label="Состояние очередей">
+            <article class="metric card"><span>В очереди</span><strong id="metricQueued">—</strong><small>durable jobs</small></article>
+            <article class="metric card"><span>В работе</span><strong id="metricRunning">—</strong><small>активные jobs</small></article>
+            <article class="metric card"><span>Повтор</span><strong id="metricRetry">—</strong><small>ожидают retry</small></article>
+            <article class="metric card"><span>На проверке</span><strong id="metricReview">—</strong><small>конспекты на проверке</small></article>
+            <article class="metric card danger-metric"><span>Ошибки</span><strong id="metricFailed">—</strong><small>нужен manual retry</small></article>
+          </div>
+
+          <div class="two-columns">
+            <section class="card section-card">
+              <div class="section-heading"><div><p class="eyebrow">RUNTIME</p><h2>Компоненты</h2></div><span id="runID" class="mono subtle"></span></div>
+              <div id="componentList" class="stack empty-state">Подключитесь к приложению</div>
+            </section>
+            <section class="card section-card">
+              <div class="section-heading"><div><p class="eyebrow">QUICK ACTIONS</p><h2>Управление</h2></div></div>
+              <div class="action-list">
+                <button id="exportNow" class="action-row"><span><b>Экспортировать в Obsidian</b><small>Поставить snapshot графа в очередь</small></span><i>→</i></button>
+                <button class="action-row" data-go="review"><span><b>Открыть review</b><small>Проверить предложения LLM</small></span><i>→</i></button>
+                <button id="shutdownApp" class="action-row danger"><span><b>Остановить приложение</b><small>Graceful shutdown всех компонентов</small></span><i>×</i></button>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section id="view-sources" class="view">
+          <div class="two-columns source-layout">
+            <section class="card section-card manual-input">
+              <div class="section-heading">
+                <div><p class="eyebrow">MANUAL INGEST</p><h2>Проверить pipeline текстом</h2></div>
+                <span class="chip">без аудио</span>
+              </div>
+              <p class="section-copy">Текст будет проанализирован и разбит на тематические конспекты для проверки.</p>
+              <form id="manualTextForm">
+                <label for="manualText">Текст или заметка</label>
+                <textarea id="manualText" rows="10" maxlength="250000" placeholder="Например: Векторное пространство — множество элементов, для которых определены сложение и умножение на скаляр…" required></textarea>
+                <div class="form-footer"><small id="manualCount">0 символов</small><button class="primary" type="submit">Отправить в pipeline</button></div>
+              </form>
+            </section>
+
+            <section class="card section-card">
+              <div class="section-heading"><div><p class="eyebrow">REALTIME CAPTURE</p><h2>Доступные источники</h2></div></div>
+              <div id="sourceList" class="stack empty-state">Источники загружаются…</div>
+            </section>
+          </div>
+
+          <section class="card section-card table-card">
+            <div class="section-heading"><div><p class="eyebrow">SESSIONS</p><h2>История запусков</h2></div><button id="refreshSources" class="secondary">Обновить</button></div>
+            <div class="table-wrap">
+              <table><thead><tr><th>Источник</th><th>Сессия</th><th>Состояние</th><th>Запущена</th><th></th></tr></thead><tbody id="sessionRows"></tbody></table>
+            </div>
+          </section>
+        </section>
+
+        <section id="view-review" class="view">
+          <div class="view-intro">
+            <div><p class="eyebrow">HUMAN IN THE LOOP</p><h2>Предложения к графу</h2><p>Проверьте термины и мысли, сохраните решения и примените конспект целиком.</p></div>
+            <button id="refreshReview" class="secondary">Обновить</button>
+          </div>
+          <div id="reviewList" class="stack empty-state">Нет ожидающих предложений</div>
+        </section>
+
+        <section id="view-knowledge" class="view">
+          <div class="view-intro">
+            <div><p class="eyebrow">CANONICAL STATE</p><h2>Граф знаний</h2><p id="graphSummary">Только одобренные пользователем данные.</p></div>
+            <button id="refreshGraph" class="secondary">Обновить</button>
+          </div>
+          <section class="card graph-card">
+            <div class="graph-legend"><span><i class="legend-term"></i>Термин</span><span><i class="legend-thought"></i>Мысль</span><span id="graphLimitNotice"></span></div>
+            <div class="graph-viewport"><svg id="knowledgeGraph" role="img" aria-label="Граф терминов и мыслей"></svg></div>
+            <aside id="nodeDetails" class="node-details"><p class="subtle">Выберите узел, чтобы посмотреть детали.</p></aside>
+          </section>
+          <div class="two-columns knowledge-lists">
+            <section class="card section-card"><div class="section-heading"><h2>Термины</h2><span id="termCount" class="chip">0</span></div><div id="termList" class="entity-list"></div></section>
+            <section class="card section-card"><div class="section-heading"><h2>Мысли</h2><span id="thoughtCount" class="chip">0</span></div><div id="thoughtList" class="entity-list"></div></section>
+          </div>
+        </section>
+
+        <section id="view-jobs" class="view">
+          <div class="view-intro">
+            <div><p class="eyebrow">DURABLE PROCESSING</p><h2>Очередь заданий</h2><p>Failed jobs можно безопасно вернуть в очередь вручную.</p></div>
+            <label class="inline-field">Статус <select id="jobStatus"><option value="">Все</option><option value="queued">Queued</option><option value="running">Running</option><option value="retry">Retry</option><option value="failed">Failed</option><option value="done">Done</option></select></label>
+          </div>
+          <details id="developerBatches" class="card section-card"><summary>Developer: Analysis batches и ответы модели</summary><div id="batchList"></div></details>
+          <section class="card section-card table-card"><div class="table-wrap"><table><thead><tr><th>Тип</th><th>ID</th><th>Статус</th><th>Попытки</th><th>Доступно</th><th></th></tr></thead><tbody id="jobRows"></tbody></table></div></section>
+        </section>
+
+        <section id="view-events" class="view">
+          <div class="view-intro">
+            <div><p class="eyebrow">USER EVENTS</p><h2>Уведомления</h2><p>История сохраняется после перезапуска приложения.</p></div>
+            <button id="refreshEvents" class="secondary">Обновить</button>
+          </div>
+          <div id="eventList" class="timeline empty-state">Событий пока нет</div>
+        </section>
+
+        <section id="view-settings" class="view">
+          <div class="view-intro"><div><p class="eyebrow">CONFIGURATION</p><h2>Настройки</h2><p>Изменения сохраняются в TOML и применяются после перезапуска.</p></div></div>
+          <form id="settingsForm" class="settings-grid">
+            <section class="card section-card settings-section">
+              <h2>Общие</h2>
+              <label>Язык <input name="language" autocomplete="off"></label>
+              <label>Уровень логов <select name="log_level"><option>debug</option><option>info</option><option>warn</option><option>error</option></select></label>
+              <label>Лимит processing <input name="processing_limit" type="number" min="1"></label>
+              <label>Лимит review <input name="review_limit" type="number" min="1"></label>
+            </section>
+            <section class="card section-card settings-section">
+              <h2>LLM</h2>
+              <label class="check-row"><input name="models_managed" type="checkbox"><span>Управлять llama-server автоматически</span></label>
+              <label>llama-server <input name="llama_binary" autocomplete="off"></label>
+              <label>GGUF-модель <input name="llm_model" autocomplete="off"></label>
+              <label>LLM URL <input name="llm_url" type="url" autocomplete="off"></label>
+              <label>Параллельные слоты <input name="model_parallel" type="number" min="1"></label>
+              <label>Дополнительные аргументы llama-server
+                <textarea name="llama_server_args" rows="4" spellcheck="false" placeholder='["--flash-attn", "on"]'></textarea>
+              </label>
+            </section>
+            <section class="card section-card settings-section">
+              <h2>Аудио-модели</h2>
+              <label>Whisper <input name="whisper_model" autocomplete="off"></label>
+              <label>Silero VAD <input name="silero_model" autocomplete="off"></label>
+              <label>ONNX Runtime <input name="onnx_runtime" autocomplete="off"></label>
+            </section>
+            <section class="card section-card settings-section">
+              <h2>Экспорт</h2>
+              <label>Каталог Obsidian <input name="obsidian_directory" autocomplete="off"></label>
+              <label class="check-row"><input name="auto_export" type="checkbox"><span>Экспортировать после изменения графа</span></label>
+              <div class="settings-actions"><span id="settingsHint" class="subtle"></span><button class="primary" type="submit">Сохранить</button></div>
+            </section>
+          </form>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <dialog id="authDialog" class="auth-dialog">
+    <form id="authForm" method="dialog">
+      <span class="brand-mark large">KC</span>
+      <p class="eyebrow">LOCAL AUTHENTICATION</p>
+      <h2>Подключение к приложению</h2>
+      <p>Введите bearer token из локального файла. Он останется только в текущей вкладке браузера.</p>
+      <label for="tokenInput">API token</label>
+      <input id="tokenInput" type="password" autocomplete="off" spellcheck="false" required>
+      <small id="tokenHint" class="token-hint"></small>
+      <p id="authError" class="form-error" role="alert"></p>
+      <button class="primary full" type="submit">Подключиться</button>
+    </form>
+  </dialog>
+
+  <dialog id="confirmDialog" class="confirm-dialog">
+    <form method="dialog">
+      <h2 id="confirmTitle">Подтверждение</h2>
+      <p id="confirmText"></p>
+      <div class="dialog-actions"><button value="cancel" class="secondary">Отмена</button><button value="confirm" class="danger-button">Продолжить</button></div>
+    </form>
+  </dialog>
+
+  <div id="toastRegion" class="toast-region" aria-live="polite"></div>
+  <script src="/ui/review.js" defer></script>
+  <script src="/ui/app.js" defer></script>
+</body>
+</html>

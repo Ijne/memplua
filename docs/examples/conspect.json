@@ -1,0 +1,21 @@
+{
+  "conspects": [{
+    "topic": "Context handling",
+    "terms": [{
+      "ref": "term-1",
+      "name": "Context Tail",
+      "description": "A bounded tail of the previous batch, used only for understanding.",
+      "tags": ["technology"],
+      "evidence_chunk_ids": ["chunk-12"],
+      "anchor_chunk_id": "chunk-12"
+    }],
+    "thoughts": [{
+      "thesis": "Extract only newly supported knowledge",
+      "body": "Every candidate is anchored to a focus chunk.",
+      "related_term_refs": ["term-1"],
+      "tags": ["idea"],
+      "evidence_chunk_ids": ["chunk-11", "chunk-12"],
+      "anchor_chunk_id": "chunk-12"
+    }]
+  }]
+}

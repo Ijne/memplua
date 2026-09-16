@@ -1,0 +1,22 @@
+export type Resolution = 'create' | 'update' | 'keep_existing' | 'reject';
+export type Value = { name?: string; description?: string; thesis?: string; body?: string; tags: string[] | null };
+export type Match = { id: string; kind: 'term' | 'thought'; source: 'canonical' | 'pending'; exact: boolean; version: number; value: Value };
+export type Item = {
+  id: string; kind: 'term' | 'thought'; status: 'pending' | 'resolved' | 'applied' | 'failed';
+  incoming_variants: { candidate_id: string; value: Value; related_terms?: string[] }[];
+  canonical_matches: Match[] | null; pending_matches: Match[] | null;
+  resolution: Resolution | ''; target_id?: string; target_version: number; final_value: Value;
+  related_item_ids?: string[];
+};
+export type Tag = { id: string; name: string; aliases: string[] | null; enabled: boolean };
+export type TaxonomyItem = { id: string; kind: 'tag'; value: string; resolution: '' | 'create' | 'map' | 'remove'; target_id?: string; required: boolean };
+export type Summary = { id: string; topic: string; created_at: string; status: string; source_kind: string; item_count: number; unresolved_items: number; unresolved_tags: number };
+export type Conspect = Summary & { items: Item[]; taxonomy: TaxonomyItem[] };
+export type Source = { text: string; source_kind: string; started_at: string; ended_at: string };
+export type Decision = { resolution: Resolution; target_id?: string; target_version?: number; final_value?: Value; related_item_ids?: string[] };
+export type TaxonomyDecision = { resolution: 'create' | 'map' | 'remove'; target_id?: string; value?: string };
+export const titleOf = (value: Value) => value.name || value.thesis || '';
+export const bodyOf = (value: Value) => value.description || value.body || '';
+export const detailPath = (id: string) => `/api/v1/review/conspects/${encodeURIComponent(id)}?view=desktop`;
+export const summaryKey = ['desktop', 'review', 'summaries'] as const;
+export const detailKey = (id: string) => ['desktop', 'review', 'detail', id] as const;

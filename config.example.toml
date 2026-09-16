@@ -1,0 +1,73 @@
+# Relative paths are resolved below data_dir. data_dir itself is relative to this file.
+data_dir = "data"
+# The legacy root language key is still accepted as conspect.language.
+
+[ui]
+language = "ru" # New installs follow the Windows locale (ru or en).
+theme = "system"
+always_on_top = true
+start_with_windows = false
+
+[conspect]
+language = "ru"
+
+[api]
+listen = "127.0.0.1:7331"
+token = ""
+token_file = "api.token"
+allowed_origin = ""
+
+[models]
+managed = true
+# Supply trusted local files. Relative paths are resolved using the rules in
+# docs/configuration.md; model files are intentionally not part of the repository.
+llama_binary = "models/llama-server.exe"
+llm_model = "models/knowledge-model.gguf"
+llm_url = "http://127.0.0.1:8081"
+parallel = 1
+server_args = [] # Example: ["--flash-attn", "on"]
+whisper_model = "models/whisper.bin"
+silero_model = "models/silero-vad.onnx"
+onnx_runtime = "models/onnxruntime.dll"
+context_size = 16384
+gpu_layers = 99
+startup_timeout = "45s"
+request_timeout = "10m"
+max_tokens = 4096
+temperature = 0.1
+
+[audio]
+tick_interval = "1ms"
+segment_length = "30s"
+transcription_timeout = "5m"
+vad_window = 512
+vad_threshold = 0.5
+
+[storage]
+database = "knowledge.db"
+
+[pipeline]
+conspect_max_duration = "5m"
+conspect_idle_timeout = "90s"
+batch_sweep_interval = "5s"
+context_tail_chars = 1500
+similarity_threshold = 0.30
+similarity_limit = 5
+processing_limit = 1000
+review_limit = 500
+workers = 2
+max_attempts = 3
+lease = "2m"
+poll_interval = "500ms"
+
+[logging]
+level = "info"
+directory = "logs"
+json = true
+console = true
+max_size_mb = 10
+backup_files = 3
+
+[export]
+obsidian_directory = "exports/obsidian"
+auto = false

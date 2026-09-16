@@ -1,16 +1,55 @@
+# Native binaries and local models
 *.bin
-*.ps1
-*.3-x64
 *.dll
 *.exe
 *.gguf
-*.json
-*.txt
 *.onnx
+*.safetensors
+*.pt
+*.pth
 *.zip
-*.mp3
+/models_storage/
+
+# Runtime state
+/data/
+/.sqlite/
+/chunks/
+/conspects/
+/obsidian/
+/.knowledgecrawler/
+/.cache/
+/.tmp-*/
+/frontend/desktop/.tmp/
+knowledgecrawler.db
+knowledgecrawler.db-shm
+knowledgecrawler.db-wal
+*.log
+api.token
+config.local.toml
+/config.toml
+
+# Research data and generated artifacts
+/research/.venv/
+/research/datasets/
+/research/checkpoints/
+/research/artifacts/
+__pycache__/
+*.py[cod]
+
+# IDE and local diagrams
 *.excalidraw
-/obsidian
-/docs
-/models_storage/lora
-TODO
+.idea/
+.vscode/
+
+# OS metadata and local coverage/profiling output
+.DS_Store
+Thumbs.db
+desktop.ini
+coverage.out
+*.prof
+
+# Conspect storage and UI test dependencies
+knowledge.db
+knowledge.db-wal
+knowledge.db-shm
+node_modules/
