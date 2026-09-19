@@ -1,7 +1,5 @@
 ---
-id: "11111111-1111-4111-8111-111111111111"
-type: term
-version: 2
+kind: term
 tags:
   - "mathematics"
   - "learning"
@@ -9,8 +7,11 @@ tags:
 
 # Topology
 
-Study of continuous shapes.
+> [!abstract] Definition
+> Study of continuous shapes.
 
-## Thoughts
+## Related ideas
 
-- [[thoughts/Continuity-matters--22222222222242228222222222222222|Continuity matters]]
+### [Continuity matters](<../thoughts/22222222-2222-4222-8222-222222222222/%5BT%5D.md>)
+
+Small changes remain small.

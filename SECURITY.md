@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-KnowledgeCrawler has not made a stable public release. Security fixes currently
+memplua has not made a stable public release. Security fixes currently
 target the latest main branch only. This policy must be replaced with a version
 support table when releases begin.
 

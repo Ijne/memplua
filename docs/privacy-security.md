@@ -1,6 +1,6 @@
 # Privacy and security model
 
-KnowledgeCrawler processes potentially sensitive speech and notes. The current
+memplua processes potentially sensitive speech and notes. The current
 design is local-first, but local-first is not equivalent to zero risk.
 
 ## Data that remains local by design
@@ -49,7 +49,7 @@ provide multi-user authorization.
 
 Model files, llama-server, whisper.cpp libraries, and ONNX Runtime are executable
 or parser attack surfaces supplied by the user. Obtain them from trusted sources
-and verify hashes. KnowledgeCrawler currently does not download or verify them.
+and verify hashes. memplua currently does not download or verify them.
 
 Prompts are data sent to the local model. Model output is untrusted and passes
 strict JSON parsing, evidence validation, deterministic matching, taxonomy
@@ -59,7 +59,7 @@ review, human decisions, and transactional validation before canonical storage.
 
 The Obsidian exporter sanitizes filenames, disambiguates collisions with stable
 IDs, writes atomically, and deletes only files listed in its manifest. Pointing
-multiple KnowledgeCrawler instances at the same export directory is unsupported.
+multiple memplua instances at the same export directory is unsupported.
 
 ## Reporting a vulnerability
 

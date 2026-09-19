@@ -21,7 +21,7 @@ type handler struct {
 	files   http.Handler
 }
 
-// New returns the embedded KnowledgeCrawler control panel. The static UI is
+// New returns the embedded memplua control panel. The static UI is
 // public on the loopback listener, while every data request still requires the
 // local API bearer token.
 func New(options Options) http.Handler {

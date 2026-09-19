@@ -115,17 +115,22 @@ export function ItemEditor({ item, allItems, tags, taxonomy, save, saveTaxonomy,
     saver.edit({ ...draft, targetId: id, resolution: '' });
   }
   function renameNewTag(id: string, originalName: string, value: string) {
-    const tagsValue = [...(draft.value.tags || [])];
-    const currentName = draft.tagEdits[id] ?? originalName;
-    const index = tagsValue.findIndex(name => normalize(name) === normalize(currentName) || normalize(name) === normalize(originalName));
-    if (index < 0) return;
-    tagsValue[index] = value;
-    saver.edit({
-      ...draft,
-      resolution: draft.resolution || (focused ? 'update' : 'create'),
-      value: { ...draft.value, tags: tagsValue },
-      tagEdits: { ...draft.tagEdits, [id]: value },
-    });
+	// Read the autosave's mutable value instead of the render snapshot. A clear
+	// followed immediately by typing can deliver another input event before
+	// React commits the intervening render; using the stale snapshot would append
+	// the replacement to the old tag name.
+	const currentDraft = saver.value;
+	const tagsValue = [...(currentDraft.value.tags || [])];
+	const currentName = currentDraft.tagEdits[id] ?? originalName;
+	const index = tagsValue.findIndex(name => normalize(name) === normalize(currentName) || normalize(name) === normalize(originalName));
+	if (index < 0) return;
+	tagsValue[index] = value;
+	saver.edit({
+	  ...currentDraft,
+	  resolution: currentDraft.resolution || (focused ? 'update' : 'create'),
+	  value: { ...currentDraft.value, tags: tagsValue },
+	  tagEdits: { ...currentDraft.tagEdits, [id]: value },
+	});
   }
   function toggleRelationship(id: string) {
     saver.edit({

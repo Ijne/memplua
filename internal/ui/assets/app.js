@@ -40,7 +40,7 @@ async function init() {
   try {
     const response = await fetch("/ui/bootstrap.json", { cache: "no-store" });
     state.bootstrap = await response.json();
-    document.querySelector("#uiVersion").textContent = `KnowledgeCrawler ${state.bootstrap.version || ""}`;
+    document.querySelector("#uiVersion").textContent = `memplua ${state.bootstrap.version || ""}`;
     document.querySelector("#tokenHint").textContent = state.bootstrap.token_file
       ? `Файл token: ${state.bootstrap.token_file}`
       : "Путь к token отображается в терминале при запуске.";
@@ -48,7 +48,7 @@ async function init() {
     document.querySelector("#tokenHint").textContent = "Не удалось получить сведения о token-файле.";
   }
 
-  const savedToken = sessionStorage.getItem("knowledgecrawler.apiToken");
+  const savedToken = sessionStorage.getItem("memplua.apiToken");
   if (savedToken) {
     document.querySelector("#tokenInput").value = savedToken;
     await connect(savedToken);
@@ -125,7 +125,7 @@ async function connect(token) {
   state.token = token;
   try {
     const status = await api("/api/v1/status");
-    sessionStorage.setItem("knowledgecrawler.apiToken", token);
+    sessionStorage.setItem("memplua.apiToken", token);
     setConnected(true);
     applyStatus(status);
     const dialog = document.querySelector("#authDialog");
@@ -134,7 +134,7 @@ async function connect(token) {
     startEventStream();
   } catch (error) {
     state.token = "";
-    sessionStorage.removeItem("knowledgecrawler.apiToken");
+    sessionStorage.removeItem("memplua.apiToken");
     setConnected(false);
     document.querySelector("#authError").textContent = error.message || "Не удалось подключиться.";
     showAuth();
@@ -143,7 +143,7 @@ async function connect(token) {
 
 function disconnect() {
   state.token = "";
-  sessionStorage.removeItem("knowledgecrawler.apiToken");
+  sessionStorage.removeItem("memplua.apiToken");
   state.streamGeneration += 1;
   if (state.streamController) state.streamController.abort();
   state.streamController = null;
@@ -696,7 +696,7 @@ async function exportObsidian() {
 }
 
 async function shutdownApplication() {
-  if (!(await confirmAction("Остановить KnowledgeCrawler?", "Новые данные перестанут приниматься, текущие durable jobs освободят lease."))) return;
+  if (!(await confirmAction("Остановить memplua?", "Новые данные перестанут приниматься, текущие durable jobs освободят lease."))) return;
   try {
     await api("/api/v1/application/shutdown", { method: "POST" });
     toast("Приложение останавливается", "success");

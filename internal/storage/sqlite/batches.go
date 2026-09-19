@@ -134,6 +134,12 @@ func copyContextTail(ctx context.Context, tx *sql.Tx, batchID, sessionID string,
 	if limit <= 0 {
 		return nil
 	}
+	// Context exists only to complete text split at a batch boundary. Large
+	// excerpts invite small local models to extract the previous topic again.
+	const maximumContinuityRunes = 400
+	if limit > maximumContinuityRunes {
+		limit = maximumContinuityRunes
+	}
 	// Only the immediately preceding batch supplies context, even if extraction is still queued.
 	rows, err := tx.QueryContext(ctx, `SELECT bc.chunk_id,bc.position,bc.text FROM analysis_batch_chunks bc WHERE bc.role='focus' AND bc.batch_id=(SELECT id FROM analysis_batches WHERE source_session_id=? AND id<>? ORDER BY rowid DESC LIMIT 1) ORDER BY bc.position DESC`, sessionID, batchID)
 	if err != nil {
@@ -151,13 +157,19 @@ func copyContextTail(ctx context.Context, tx *sql.Tx, batchID, sessionID string,
 			rows.Close()
 			return err
 		}
-		chars := []rune(f.text)
+		chars, boundary := continuitySuffix(f.text)
 		if len(chars) > limit {
 			chars = chars[len(chars)-limit:]
+			boundary = true
 		}
-		f.text = string(chars)
+		f.text = strings.TrimSpace(string(chars))
 		limit -= len(chars)
-		tail = append(tail, f)
+		if f.text != "" {
+			tail = append(tail, f)
+		}
+		if boundary {
+			break
+		}
 	}
 	if err = rows.Err(); err != nil {
 		rows.Close()
@@ -170,6 +182,17 @@ func copyContextTail(ctx context.Context, tx *sql.Tx, batchID, sessionID string,
 		}
 	}
 	return nil
+}
+
+func continuitySuffix(text string) ([]rune, bool) {
+	chars := []rune(strings.TrimSpace(text))
+	for index := len(chars) - 1; index >= 0; index-- {
+		switch chars[index] {
+		case '.', '!', '?', '\n', '。', '！', '？':
+			return chars[index+1:], true
+		}
+	}
+	return chars, false
 }
 
 func closeBatch(ctx context.Context, tx *sql.Tx, batchID string, now time.Time, reason string) error {

@@ -1,6 +1,5 @@
-.logo { color: var(--text); flex-shrink: 0; }
-.wheel { transform-origin: 30px 12px; }
-.logo[data-activity='recording'] .wheel { animation: wheel 6s linear infinite; }
-.logo[data-activity='working'] .wheel { animation: wheel 2.5s linear infinite; }
-@keyframes wheel { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .logo[data-activity='recording'] .wheel, .logo[data-activity='working'] .wheel { animation: none; filter: brightness(1.2); } }
+.logo { color: var(--accent); flex-shrink: 0; }
+.logo[data-activity='recording'] .point { animation: point-pulse 1.8s ease-in-out infinite; }
+.logo[data-activity='working'] .point { animation: point-pulse 1s ease-in-out infinite; }
+@keyframes point-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .logo[data-activity='recording'] .point, .logo[data-activity='working'] .point { animation: none; opacity: .65; } }

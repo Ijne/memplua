@@ -121,7 +121,7 @@ type Export struct {
 // Default returns a complete portable configuration before file/env overrides.
 func Default() Config {
 	dataDir := defaultDataDir()
-	return Config{
+	cfg := Config{
 		Storage:  Storage{Database: "knowledge.db"},
 		DataDir:  dataDir,
 		Language: "ru",
@@ -154,7 +154,7 @@ func Default() Config {
 			ConspectMaxDuration: 5 * time.Minute,
 			ConspectIdleTimeout: 90 * time.Second,
 			BatchSweepInterval:  5 * time.Second,
-			ContextTailChars:    1500,
+			ContextTailChars:    400,
 			SimilarityThreshold: 0.30,
 			SimilarityLimit:     5,
 			ProcessingLimit:     1000,
@@ -176,15 +176,56 @@ func Default() Config {
 			ObsidianDirectory: filepath.Join("exports", "obsidian"),
 		},
 	}
+	if executable, err := os.Executable(); err == nil {
+		applyBundledModelDefaults(&cfg, filepath.Dir(executable))
+	}
+	return cfg
 }
 
-// DefaultPath returns the per-user KnowledgeCrawler TOML path.
+// applyBundledModelDefaults discovers the stable layout produced by the
+// Windows installer. Development builds without that layout keep empty paths
+// and surface the usual actionable model-configuration events.
+func applyBundledModelDefaults(cfg *Config, applicationDirectory string) {
+	candidates := []struct {
+		target *string
+		path   string
+	}{
+		{&cfg.Models.LlamaBinary, filepath.Join(applicationDirectory, "runtime", "llama", "llama-server.exe")},
+		{&cfg.Models.LLMModel, filepath.Join(applicationDirectory, "models", "llm.gguf")},
+		{&cfg.Models.WhisperModel, filepath.Join(applicationDirectory, "models", "whisper.bin")},
+		{&cfg.Models.SileroModel, filepath.Join(applicationDirectory, "models", "silero.onnx")},
+		{&cfg.Models.ONNXRuntime, filepath.Join(applicationDirectory, "runtime", "onnxruntime.dll")},
+	}
+	for _, candidate := range candidates {
+		if *candidate.target != "" {
+			continue
+		}
+		if info, err := os.Stat(candidate.path); err == nil && !info.IsDir() {
+			*candidate.target = candidate.path
+		}
+	}
+}
+
+// DefaultPath returns the per-user memplua TOML path. Existing installations
+// keep using their legacy configuration path so an application update cannot
+// orphan the configured database, model paths, or review queue.
 func DefaultPath() string {
 	directory, err := os.UserConfigDir()
 	if err != nil || directory == "" {
 		return filepath.Join(defaultDataDir(), "config.toml")
 	}
-	return filepath.Join(directory, "KnowledgeCrawler", "config.toml")
+	return defaultConfigPath(directory)
+}
+
+func defaultConfigPath(directory string) string {
+	current := filepath.Join(directory, "memplua", "config.toml")
+	legacy := filepath.Join(directory, "KnowledgeCrawler", "config.toml")
+	if _, err := os.Stat(current); errors.Is(err, os.ErrNotExist) {
+		if _, legacyErr := os.Stat(legacy); legacyErr == nil {
+			return legacy
+		}
+	}
+	return current
 }
 
 // DatabasePath resolves the configured database relative to DataDir.
@@ -666,13 +707,24 @@ func assign(cfg *Config, key, raw string) error {
 }
 
 func applyEnvironment(cfg *Config) error {
-	setString := func(name string, target *string) {
+	lookup := func(name string) (string, bool) {
 		if value, ok := os.LookupEnv(name); ok {
+			return value, true
+		}
+		// KNOWLEDGECRAWLER_* remains a read-only compatibility alias. New
+		// documentation and scripts expose only the MEMPLUA_* prefix.
+		if strings.HasPrefix(name, "MEMPLUA_") {
+			return os.LookupEnv("KNOWLEDGECRAWLER_" + strings.TrimPrefix(name, "MEMPLUA_"))
+		}
+		return "", false
+	}
+	setString := func(name string, target *string) {
+		if value, ok := lookup(name); ok {
 			*target = value
 		}
 	}
 	setInt := func(name string, target *int) error {
-		if value, ok := os.LookupEnv(name); ok {
+		if value, ok := lookup(name); ok {
 			parsed, err := strconv.Atoi(value)
 			if err != nil {
 				return fmt.Errorf("config: %s must be an integer: %w", name, err)
@@ -682,7 +734,7 @@ func applyEnvironment(cfg *Config) error {
 		return nil
 	}
 	setBool := func(name string, target *bool) error {
-		if value, ok := os.LookupEnv(name); ok {
+		if value, ok := lookup(name); ok {
 			parsed, err := strconv.ParseBool(value)
 			if err != nil {
 				return fmt.Errorf("config: %s must be a boolean: %w", name, err)
@@ -692,7 +744,7 @@ func applyEnvironment(cfg *Config) error {
 		return nil
 	}
 	setDuration := func(name string, target *time.Duration) error {
-		if value, ok := os.LookupEnv(name); ok {
+		if value, ok := lookup(name); ok {
 			parsed, err := time.ParseDuration(value)
 			if err != nil {
 				return fmt.Errorf("config: %s must be a duration: %w", name, err)
@@ -702,7 +754,7 @@ func applyEnvironment(cfg *Config) error {
 		return nil
 	}
 	setFloat := func(name string, target *float64) error {
-		if value, ok := os.LookupEnv(name); ok {
+		if value, ok := lookup(name); ok {
 			parsed, err := strconv.ParseFloat(value, 64)
 			if err != nil {
 				return fmt.Errorf("config: %s must be a number: %w", name, err)
@@ -712,7 +764,7 @@ func applyEnvironment(cfg *Config) error {
 		return nil
 	}
 	setStringArray := func(name string, target *[]string) error {
-		if value, ok := os.LookupEnv(name); ok {
+		if value, ok := lookup(name); ok {
 			var parsed []string
 			if err := json.Unmarshal([]byte(value), &parsed); err != nil {
 				return fmt.Errorf("config: %s must be a JSON string array: %w", name, err)
@@ -721,99 +773,99 @@ func applyEnvironment(cfg *Config) error {
 		}
 		return nil
 	}
-	setString("KNOWLEDGECRAWLER_DATA_DIR", &cfg.DataDir)
-	setString("KNOWLEDGECRAWLER_DATABASE", &cfg.Storage.Database)
-	setString("KNOWLEDGECRAWLER_LANGUAGE", &cfg.Conspect.Language)
-	setString("KNOWLEDGECRAWLER_CONSPECT_LANGUAGE", &cfg.Conspect.Language)
+	setString("MEMPLUA_DATA_DIR", &cfg.DataDir)
+	setString("MEMPLUA_DATABASE", &cfg.Storage.Database)
+	setString("MEMPLUA_LANGUAGE", &cfg.Conspect.Language)
+	setString("MEMPLUA_CONSPECT_LANGUAGE", &cfg.Conspect.Language)
 	cfg.Language = cfg.Conspect.Language
-	setString("KNOWLEDGECRAWLER_UI_LANGUAGE", &cfg.UI.Language)
-	setString("KNOWLEDGECRAWLER_UI_THEME", &cfg.UI.Theme)
-	setString("KNOWLEDGECRAWLER_API_LISTEN", &cfg.API.Listen)
-	setString("KNOWLEDGECRAWLER_API_TOKEN", &cfg.API.Token)
-	setString("KNOWLEDGECRAWLER_API_TOKEN_FILE", &cfg.API.TokenFile)
-	setString("KNOWLEDGECRAWLER_API_ALLOWED_ORIGIN", &cfg.API.AllowedOrigin)
-	setString("KNOWLEDGECRAWLER_LLAMA_BINARY", &cfg.Models.LlamaBinary)
-	setString("KNOWLEDGECRAWLER_LLM_MODEL", &cfg.Models.LLMModel)
-	setString("KNOWLEDGECRAWLER_LLM_URL", &cfg.Models.LLMURL)
-	setString("KNOWLEDGECRAWLER_WHISPER_MODEL", &cfg.Models.WhisperModel)
-	setString("KNOWLEDGECRAWLER_SILERO_MODEL", &cfg.Models.SileroModel)
-	setString("KNOWLEDGECRAWLER_ONNX_RUNTIME", &cfg.Models.ONNXRuntime)
-	if err := setStringArray("KNOWLEDGECRAWLER_LLAMA_SERVER_ARGS", &cfg.Models.ServerArgs); err != nil {
+	setString("MEMPLUA_UI_LANGUAGE", &cfg.UI.Language)
+	setString("MEMPLUA_UI_THEME", &cfg.UI.Theme)
+	setString("MEMPLUA_API_LISTEN", &cfg.API.Listen)
+	setString("MEMPLUA_API_TOKEN", &cfg.API.Token)
+	setString("MEMPLUA_API_TOKEN_FILE", &cfg.API.TokenFile)
+	setString("MEMPLUA_API_ALLOWED_ORIGIN", &cfg.API.AllowedOrigin)
+	setString("MEMPLUA_LLAMA_BINARY", &cfg.Models.LlamaBinary)
+	setString("MEMPLUA_LLM_MODEL", &cfg.Models.LLMModel)
+	setString("MEMPLUA_LLM_URL", &cfg.Models.LLMURL)
+	setString("MEMPLUA_WHISPER_MODEL", &cfg.Models.WhisperModel)
+	setString("MEMPLUA_SILERO_MODEL", &cfg.Models.SileroModel)
+	setString("MEMPLUA_ONNX_RUNTIME", &cfg.Models.ONNXRuntime)
+	if err := setStringArray("MEMPLUA_LLAMA_SERVER_ARGS", &cfg.Models.ServerArgs); err != nil {
 		return err
 	}
-	setString("KNOWLEDGECRAWLER_LOG_LEVEL", &cfg.Logging.Level)
-	setString("KNOWLEDGECRAWLER_OBSIDIAN_DIR", &cfg.Export.ObsidianDirectory)
+	setString("MEMPLUA_LOG_LEVEL", &cfg.Logging.Level)
+	setString("MEMPLUA_OBSIDIAN_DIR", &cfg.Export.ObsidianDirectory)
 	for _, item := range []struct {
 		name   string
 		target *int
 	}{
-		{"KNOWLEDGECRAWLER_MODEL_CONTEXT_SIZE", &cfg.Models.ContextSize},
-		{"KNOWLEDGECRAWLER_MODEL_GPU_LAYERS", &cfg.Models.GPULayers},
-		{"KNOWLEDGECRAWLER_MODEL_PARALLEL", &cfg.Models.Parallel},
-		{"KNOWLEDGECRAWLER_MODEL_MAX_TOKENS", &cfg.Models.MaxTokens},
-		{"KNOWLEDGECRAWLER_AUDIO_VAD_WINDOW", &cfg.Audio.VADWindow},
-		{"KNOWLEDGECRAWLER_CONTEXT_TAIL_CHARS", &cfg.Pipeline.ContextTailChars},
-		{"KNOWLEDGECRAWLER_SIMILARITY_LIMIT", &cfg.Pipeline.SimilarityLimit},
-		{"KNOWLEDGECRAWLER_PROCESSING_LIMIT", &cfg.Pipeline.ProcessingLimit},
-		{"KNOWLEDGECRAWLER_REVIEW_LIMIT", &cfg.Pipeline.ReviewLimit},
-		{"KNOWLEDGECRAWLER_WORKERS", &cfg.Pipeline.Workers},
-		{"KNOWLEDGECRAWLER_MAX_ATTEMPTS", &cfg.Pipeline.MaxAttempts},
-		{"KNOWLEDGECRAWLER_LOG_MAX_SIZE_MB", &cfg.Logging.MaxSizeMB},
-		{"KNOWLEDGECRAWLER_LOG_BACKUP_FILES", &cfg.Logging.BackupFiles},
+		{"MEMPLUA_MODEL_CONTEXT_SIZE", &cfg.Models.ContextSize},
+		{"MEMPLUA_MODEL_GPU_LAYERS", &cfg.Models.GPULayers},
+		{"MEMPLUA_MODEL_PARALLEL", &cfg.Models.Parallel},
+		{"MEMPLUA_MODEL_MAX_TOKENS", &cfg.Models.MaxTokens},
+		{"MEMPLUA_AUDIO_VAD_WINDOW", &cfg.Audio.VADWindow},
+		{"MEMPLUA_CONTEXT_TAIL_CHARS", &cfg.Pipeline.ContextTailChars},
+		{"MEMPLUA_SIMILARITY_LIMIT", &cfg.Pipeline.SimilarityLimit},
+		{"MEMPLUA_PROCESSING_LIMIT", &cfg.Pipeline.ProcessingLimit},
+		{"MEMPLUA_REVIEW_LIMIT", &cfg.Pipeline.ReviewLimit},
+		{"MEMPLUA_WORKERS", &cfg.Pipeline.Workers},
+		{"MEMPLUA_MAX_ATTEMPTS", &cfg.Pipeline.MaxAttempts},
+		{"MEMPLUA_LOG_MAX_SIZE_MB", &cfg.Logging.MaxSizeMB},
+		{"MEMPLUA_LOG_BACKUP_FILES", &cfg.Logging.BackupFiles},
 	} {
 		if err := setInt(item.name, item.target); err != nil {
 			return err
 		}
 	}
-	if err := setBool("KNOWLEDGECRAWLER_MODELS_MANAGED", &cfg.Models.Managed); err != nil {
+	if err := setBool("MEMPLUA_MODELS_MANAGED", &cfg.Models.Managed); err != nil {
 		return err
 	}
-	if err := setBool("KNOWLEDGECRAWLER_LOG_JSON", &cfg.Logging.JSON); err != nil {
+	if err := setBool("MEMPLUA_LOG_JSON", &cfg.Logging.JSON); err != nil {
 		return err
 	}
-	if err := setBool("KNOWLEDGECRAWLER_LOG_CONSOLE", &cfg.Logging.Console); err != nil {
+	if err := setBool("MEMPLUA_LOG_CONSOLE", &cfg.Logging.Console); err != nil {
 		return err
 	}
-	if err := setBool("KNOWLEDGECRAWLER_AUTO_EXPORT", &cfg.Export.Auto); err != nil {
+	if err := setBool("MEMPLUA_AUTO_EXPORT", &cfg.Export.Auto); err != nil {
 		return err
 	}
-	if err := setDuration("KNOWLEDGECRAWLER_MODEL_STARTUP_TIMEOUT", &cfg.Models.StartupTimeout); err != nil {
+	if err := setDuration("MEMPLUA_MODEL_STARTUP_TIMEOUT", &cfg.Models.StartupTimeout); err != nil {
 		return err
 	}
-	if err := setDuration("KNOWLEDGECRAWLER_MODEL_REQUEST_TIMEOUT", &cfg.Models.RequestTimeout); err != nil {
+	if err := setDuration("MEMPLUA_MODEL_REQUEST_TIMEOUT", &cfg.Models.RequestTimeout); err != nil {
 		return err
 	}
-	if err := setDuration("KNOWLEDGECRAWLER_AUDIO_TICK_INTERVAL", &cfg.Audio.TickInterval); err != nil {
+	if err := setDuration("MEMPLUA_AUDIO_TICK_INTERVAL", &cfg.Audio.TickInterval); err != nil {
 		return err
 	}
-	if err := setDuration("KNOWLEDGECRAWLER_AUDIO_SEGMENT_LENGTH", &cfg.Audio.SegmentLength); err != nil {
+	if err := setDuration("MEMPLUA_AUDIO_SEGMENT_LENGTH", &cfg.Audio.SegmentLength); err != nil {
 		return err
 	}
-	if err := setDuration("KNOWLEDGECRAWLER_AUDIO_TRANSCRIPTION_TIMEOUT", &cfg.Audio.TranscriptionTimeout); err != nil {
+	if err := setDuration("MEMPLUA_AUDIO_TRANSCRIPTION_TIMEOUT", &cfg.Audio.TranscriptionTimeout); err != nil {
 		return err
 	}
 	for name, target := range map[string]*time.Duration{
-		"KNOWLEDGECRAWLER_CONSPECT_MAX_DURATION": &cfg.Pipeline.ConspectMaxDuration,
-		"KNOWLEDGECRAWLER_CONSPECT_IDLE_TIMEOUT": &cfg.Pipeline.ConspectIdleTimeout,
-		"KNOWLEDGECRAWLER_BATCH_SWEEP_INTERVAL":  &cfg.Pipeline.BatchSweepInterval,
+		"MEMPLUA_CONSPECT_MAX_DURATION": &cfg.Pipeline.ConspectMaxDuration,
+		"MEMPLUA_CONSPECT_IDLE_TIMEOUT": &cfg.Pipeline.ConspectIdleTimeout,
+		"MEMPLUA_BATCH_SWEEP_INTERVAL":  &cfg.Pipeline.BatchSweepInterval,
 	} {
 		if err := setDuration(name, target); err != nil {
 			return err
 		}
 	}
-	if err := setFloat("KNOWLEDGECRAWLER_SIMILARITY_THRESHOLD", &cfg.Pipeline.SimilarityThreshold); err != nil {
+	if err := setFloat("MEMPLUA_SIMILARITY_THRESHOLD", &cfg.Pipeline.SimilarityThreshold); err != nil {
 		return err
 	}
-	if err := setDuration("KNOWLEDGECRAWLER_JOB_LEASE", &cfg.Pipeline.Lease); err != nil {
+	if err := setDuration("MEMPLUA_JOB_LEASE", &cfg.Pipeline.Lease); err != nil {
 		return err
 	}
-	if err := setDuration("KNOWLEDGECRAWLER_POLL_INTERVAL", &cfg.Pipeline.PollInterval); err != nil {
+	if err := setDuration("MEMPLUA_POLL_INTERVAL", &cfg.Pipeline.PollInterval); err != nil {
 		return err
 	}
-	if err := setFloat("KNOWLEDGECRAWLER_MODEL_TEMPERATURE", &cfg.Models.Temperature); err != nil {
+	if err := setFloat("MEMPLUA_MODEL_TEMPERATURE", &cfg.Models.Temperature); err != nil {
 		return err
 	}
-	if err := setFloat("KNOWLEDGECRAWLER_AUDIO_VAD_THRESHOLD", &cfg.Audio.VADThreshold); err != nil {
+	if err := setFloat("MEMPLUA_AUDIO_VAD_THRESHOLD", &cfg.Audio.VADThreshold); err != nil {
 		return err
 	}
 	return nil
@@ -844,13 +896,13 @@ func resolve(base, value string) string {
 
 func defaultDataDir() string {
 	if directory := os.Getenv("LOCALAPPDATA"); directory != "" {
-		return filepath.Join(directory, "KnowledgeCrawler")
+		return filepath.Join(directory, "memplua")
 	}
 	directory, err := os.UserConfigDir()
 	if err != nil || directory == "" {
-		return filepath.Join(".", ".knowledgecrawler")
+		return filepath.Join(".", ".memplua")
 	}
-	return filepath.Join(directory, "KnowledgeCrawler")
+	return filepath.Join(directory, "memplua")
 }
 
 func stripComment(line string) string {

@@ -10,7 +10,7 @@ import (
 
 // CDP is available only in explicit development builds, never in production.
 func debugBrowserArgs() []string {
-	port, err := strconv.Atoi(os.Getenv("KNOWLEDGECRAWLER_DESKTOP_DEBUG_PORT"))
+	port, err := strconv.Atoi(os.Getenv("MEMPLUA_DESKTOP_DEBUG_PORT"))
 	if err != nil || port < 1024 || port > 65535 {
 		return nil
 	}
@@ -18,9 +18,9 @@ func debugBrowserArgs() []string {
 }
 
 func desktopInstanceID() string {
-	port, err := strconv.Atoi(os.Getenv("KNOWLEDGECRAWLER_DESKTOP_DEBUG_PORT"))
+	port, err := strconv.Atoi(os.Getenv("MEMPLUA_DESKTOP_DEBUG_PORT"))
 	if err != nil || port < 1024 || port > 65535 {
-		return "knowledgecrawler.desktop"
+		return "memplua.desktop"
 	}
-	return fmt.Sprintf("knowledgecrawler.desktop.debug.%d", port)
+	return fmt.Sprintf("memplua.desktop.debug.%d", port)
 }

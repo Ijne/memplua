@@ -10,7 +10,7 @@ from .prepare_dataset import prepare
 
 def parser() -> argparse.ArgumentParser:
     """Build the contributor CLI and its dataset/training subcommands."""
-    root = argparse.ArgumentParser(prog="knowledgecrawler-research")
+    root = argparse.ArgumentParser(prog="memplua-research")
     commands = root.add_subparsers(dest="command", required=True)
 
     clean_command = commands.add_parser("clean", help="find invalid or null-output examples")

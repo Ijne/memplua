@@ -8,7 +8,7 @@
 
 ## Architecture
 
-- `cmd/knowledgecrawler` is the composition root and implements `serve`, `doctor`, `export`, and `version`.
+- `cmd/memplua` is the composition root and implements `serve`, `doctor`, `export`, and `version`.
 - `internal/app` owns application lifecycle and concurrent named source sessions.
 - `internal/ingest` owns chunks, conspects, durable job contracts, leases, retries, and worker cancellation.
 - `internal/processing` wires the batch coordinator, extraction, deterministic review preparation, and exporter job handlers.

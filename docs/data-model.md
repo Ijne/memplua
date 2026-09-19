@@ -1,6 +1,6 @@
 # Data model and persistence
 
-KnowledgeCrawler uses one SQLite database with three logical data flows:
+memplua uses one SQLite database with three logical data flows:
 processing evidence, human review, and canonical knowledge. One file allows the
 final review application and export outbox to commit atomically.
 

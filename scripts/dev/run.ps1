@@ -16,6 +16,9 @@ if (-not $Config -and (Test-Path -LiteralPath $LocalConfig -PathType Leaf)) {
 if ($Native -and $CoreOnly) {
     throw "-Native and -CoreOnly cannot be used together"
 }
+if (-not $WhisperRoot -and $env:MEMPLUA_WHISPER_ROOT) {
+    $WhisperRoot = $env:MEMPLUA_WHISPER_ROOT
+}
 if (-not $WhisperRoot -and $env:KNOWLEDGECRAWLER_WHISPER_ROOT) {
     $WhisperRoot = $env:KNOWLEDGECRAWLER_WHISPER_ROOT
 }
@@ -37,9 +40,9 @@ if ($Native) {
     $Arguments += @("-tags", "native")
     Write-Output "Native audio: enabled ($WhisperRoot)"
 } else {
-    Write-Warning "Native audio is disabled. microphone and loopback will be unavailable; provide -WhisperRoot or KNOWLEDGECRAWLER_WHISPER_ROOT."
+    Write-Warning "Native audio is disabled. microphone and loopback will be unavailable; provide -WhisperRoot or MEMPLUA_WHISPER_ROOT."
 }
-$Arguments += @("./cmd/knowledgecrawler", "serve")
+$Arguments += @("./cmd/memplua", "serve")
 if ($Config) {
     $Arguments += @("--config", [IO.Path]::GetFullPath($Config))
 }

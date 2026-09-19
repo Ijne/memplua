@@ -39,7 +39,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 ## Native Windows workflow
 
 Build whisper.cpp outside this repository, then provide its root explicitly or
-through `KNOWLEDGECRAWLER_WHISPER_ROOT`:
+through `MEMPLUA_WHISPER_ROOT`:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass `

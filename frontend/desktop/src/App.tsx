@@ -31,7 +31,7 @@ function ConnectedApp() {
   const name = (params.get('window') || 'review') as WindowName;
   useEffect(() => {
     document.documentElement.dataset.window = name;
-    document.title = `${t(name)} — KnowledgeCrawler`;
+    document.title = `${t(name)} — memplua`;
     return () => { delete document.documentElement.dataset.window; };
   }, [name, t]);
   if (name === 'widget') return <Widget connected={connected} />;
@@ -56,5 +56,5 @@ export function App() {
     }
     void connect(); return () => { active = false; };
   }, [attempt]);
-  return <ErrorBoundary><QueryClientProvider client={queryClient}>{status === 'ready' ? <ConnectedApp /> : status === 'loading' ? <Loading /> : status === 'failed' ? <Failure retry={() => { setStatus('loading'); setAttempt((value) => value + 1); }} /> : <div className={styles.launch}><Logo size={96} /><span className={styles.brand}>KnowledgeCrawler</span><h1>{t('launchTitle')}</h1><p>{t('launchHint')}</p><span className={styles.privacy}><LockKeyhole />{t('local')}</span></div>}</QueryClientProvider></ErrorBoundary>;
+  return <ErrorBoundary><QueryClientProvider client={queryClient}>{status === 'ready' ? <ConnectedApp /> : status === 'loading' ? <Loading /> : status === 'failed' ? <Failure retry={() => { setStatus('loading'); setAttempt((value) => value + 1); }} /> : <div className={styles.launch}><Logo size={96} /><span className={styles.brand}>memplua</span><h1>{t('launchTitle')}</h1><p>{t('launchHint')}</p><span className={styles.privacy}><LockKeyhole />{t('local')}</span></div>}</QueryClientProvider></ErrorBoundary>;
 }

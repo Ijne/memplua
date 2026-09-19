@@ -1,6 +1,6 @@
-# Contributing to KnowledgeCrawler
+# Contributing to memplua
 
-Thank you for improving KnowledgeCrawler. The project processes private data and
+Thank you for improving memplua. The project processes private data and
 maintains a user-approved knowledge base, so correctness on cancellation,
 retries, and transaction boundaries matters as much as the happy path.
 

@@ -9,7 +9,7 @@ import (
 )
 
 func TestLoadPrecedenceAndRelativePaths(t *testing.T) {
-	clearKnowledgeCrawlerEnvironment(t)
+	clearMempluaEnvironment(t)
 	directory := t.TempDir()
 	path := filepath.Join(directory, "config.toml")
 	content := `data_dir = "file-data"
@@ -24,8 +24,8 @@ processing_limit = 20
 		t.Fatal(err)
 	}
 	environmentData := filepath.Join(directory, "env-data")
-	t.Setenv("KNOWLEDGECRAWLER_DATA_DIR", environmentData)
-	t.Setenv("KNOWLEDGECRAWLER_PROCESSING_LIMIT", "42")
+	t.Setenv("MEMPLUA_DATA_DIR", environmentData)
+	t.Setenv("MEMPLUA_PROCESSING_LIMIT", "42")
 
 	cfg, err := Load(path)
 	if err != nil {
@@ -51,8 +51,42 @@ processing_limit = 20
 	}
 }
 
+func TestRenamedDefaultsKeepLegacyInstallationsWorking(t *testing.T) {
+	clearMempluaEnvironment(t)
+	directory := t.TempDir()
+	legacy := filepath.Join(directory, "KnowledgeCrawler", "config.toml")
+	if err := os.MkdirAll(filepath.Dir(legacy), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(legacy, []byte("language = \"ru\"\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if got := defaultConfigPath(directory); got != legacy {
+		t.Fatalf("legacy config path = %q, want %q", got, legacy)
+	}
+	current := filepath.Join(directory, "memplua", "config.toml")
+	if err := os.MkdirAll(filepath.Dir(current), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(current, []byte("language = \"ru\"\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if got := defaultConfigPath(directory); got != current {
+		t.Fatalf("current config path = %q, want %q", got, current)
+	}
+
+	t.Setenv("KNOWLEDGECRAWLER_PROCESSING_LIMIT", "41")
+	cfg, err := Load(filepath.Join(directory, "missing.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Pipeline.ProcessingLimit != 41 {
+		t.Fatalf("legacy environment override = %d, want 41", cfg.Pipeline.ProcessingLimit)
+	}
+}
+
 func TestConspectSettingsAndDatabaseRoundTrip(t *testing.T) {
-	clearKnowledgeCrawlerEnvironment(t)
+	clearMempluaEnvironment(t)
 	cfg := Default()
 	cfg.DataDir = t.TempDir()
 	cfg.Storage.Database = "fresh.db"
@@ -73,7 +107,7 @@ func TestConspectSettingsAndDatabaseRoundTrip(t *testing.T) {
 }
 
 func TestLoadAcceptsDeprecatedFloatingWindowSettings(t *testing.T) {
-	clearKnowledgeCrawlerEnvironment(t)
+	clearMempluaEnvironment(t)
 	path := filepath.Join(t.TempDir(), "config.toml")
 	if err := os.WriteFile(path, []byte(`[pipeline]
 window_size = 10
@@ -92,7 +126,7 @@ overlap = 5
 }
 
 func TestLoadMakesConfigRelativePathsAbsolute(t *testing.T) {
-	clearKnowledgeCrawlerEnvironment(t)
+	clearMempluaEnvironment(t)
 	directory := t.TempDir()
 	path := filepath.Join(directory, "config.toml")
 	if err := os.WriteFile(path, []byte(`data_dir = "runtime"
@@ -125,7 +159,7 @@ llm_model = "models/knowledge.gguf"
 }
 
 func TestLoadRejectsUnknownKeyAndInvalidEnvironment(t *testing.T) {
-	clearKnowledgeCrawlerEnvironment(t)
+	clearMempluaEnvironment(t)
 	directory := t.TempDir()
 	path := filepath.Join(directory, "config.toml")
 	if err := os.WriteFile(path, []byte("surprise = true\n"), 0600); err != nil {
@@ -136,14 +170,14 @@ func TestLoadRejectsUnknownKeyAndInvalidEnvironment(t *testing.T) {
 	}
 
 	missing := filepath.Join(directory, "missing.toml")
-	t.Setenv("KNOWLEDGECRAWLER_WORKERS", "many")
+	t.Setenv("MEMPLUA_WORKERS", "many")
 	if _, err := Load(missing); err == nil || !strings.Contains(err.Error(), "must be an integer") {
 		t.Fatalf("Load error = %v, want invalid environment error", err)
 	}
 }
 
 func TestWithDataDirRebasesManagedPaths(t *testing.T) {
-	clearKnowledgeCrawlerEnvironment(t)
+	clearMempluaEnvironment(t)
 	directory := t.TempDir()
 	cfg, err := Load(filepath.Join(directory, "missing.toml"))
 	if err != nil {
@@ -168,7 +202,7 @@ func TestWithDataDirRebasesManagedPaths(t *testing.T) {
 }
 
 func TestManagerPersistsTypedSettingsAcrossUpdates(t *testing.T) {
-	clearKnowledgeCrawlerEnvironment(t)
+	clearMempluaEnvironment(t)
 	directory := t.TempDir()
 	path := filepath.Join(directory, "config.toml")
 	cfg, err := Load(path)
@@ -201,7 +235,7 @@ func TestManagerPersistsTypedSettingsAcrossUpdates(t *testing.T) {
 }
 
 func TestLlamaServerOptionsRoundTripAndRejectOwnedFlags(t *testing.T) {
-	clearKnowledgeCrawlerEnvironment(t)
+	clearMempluaEnvironment(t)
 	directory := t.TempDir()
 	path := filepath.Join(directory, "config.toml")
 	content := `[models]
@@ -238,43 +272,84 @@ server_args = ["--flash-attn", "on", "--no-mmap"]
 	}
 }
 
+func TestBundledModelDefaultsUseInstallerLayout(t *testing.T) {
+	root := t.TempDir()
+	paths := []string{
+		filepath.Join(root, "runtime", "llama", "llama-server.exe"),
+		filepath.Join(root, "runtime", "onnxruntime.dll"),
+		filepath.Join(root, "models", "llm.gguf"),
+		filepath.Join(root, "models", "whisper.bin"),
+		filepath.Join(root, "models", "silero.onnx"),
+	}
+	for _, path := range paths {
+		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("fixture"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cfg := Config{}
+	applyBundledModelDefaults(&cfg, root)
+	if cfg.Models.LlamaBinary != paths[0] || cfg.Models.ONNXRuntime != paths[1] || cfg.Models.LLMModel != paths[2] || cfg.Models.WhisperModel != paths[3] || cfg.Models.SileroModel != paths[4] {
+		t.Fatalf("bundled paths = %+v", cfg.Models)
+	}
+
+	custom := filepath.Join(root, "custom.gguf")
+	cfg.Models.LLMModel = custom
+	applyBundledModelDefaults(&cfg, root)
+	if cfg.Models.LLMModel != custom {
+		t.Fatalf("explicit model path was replaced: %q", cfg.Models.LLMModel)
+	}
+}
+
 func isWithin(root, path string) bool {
 	relative, err := filepath.Rel(root, path)
 	return err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))
 }
 
-func clearKnowledgeCrawlerEnvironment(t *testing.T) {
+func clearMempluaEnvironment(t *testing.T) {
 	t.Helper()
-	for _, name := range []string{
-		"KNOWLEDGECRAWLER_DATA_DIR", "KNOWLEDGECRAWLER_LANGUAGE", "KNOWLEDGECRAWLER_API_LISTEN",
-		"KNOWLEDGECRAWLER_API_TOKEN", "KNOWLEDGECRAWLER_API_TOKEN_FILE", "KNOWLEDGECRAWLER_API_ALLOWED_ORIGIN",
-		"KNOWLEDGECRAWLER_LLAMA_BINARY", "KNOWLEDGECRAWLER_LLM_MODEL", "KNOWLEDGECRAWLER_LLM_URL",
-		"KNOWLEDGECRAWLER_WHISPER_MODEL", "KNOWLEDGECRAWLER_SILERO_MODEL", "KNOWLEDGECRAWLER_ONNX_RUNTIME",
-		"KNOWLEDGECRAWLER_MODEL_CONTEXT_SIZE", "KNOWLEDGECRAWLER_MODEL_GPU_LAYERS",
-		"KNOWLEDGECRAWLER_MODEL_PARALLEL", "KNOWLEDGECRAWLER_LLAMA_SERVER_ARGS",
-		"KNOWLEDGECRAWLER_MODEL_MAX_TOKENS", "KNOWLEDGECRAWLER_MODEL_TEMPERATURE",
-		"KNOWLEDGECRAWLER_MODEL_STARTUP_TIMEOUT", "KNOWLEDGECRAWLER_MODEL_REQUEST_TIMEOUT",
-		"KNOWLEDGECRAWLER_AUDIO_TICK_INTERVAL", "KNOWLEDGECRAWLER_AUDIO_SEGMENT_LENGTH",
-		"KNOWLEDGECRAWLER_AUDIO_TRANSCRIPTION_TIMEOUT",
-		"KNOWLEDGECRAWLER_AUDIO_VAD_WINDOW", "KNOWLEDGECRAWLER_AUDIO_VAD_THRESHOLD",
-		"KNOWLEDGECRAWLER_WINDOW_SIZE", "KNOWLEDGECRAWLER_OVERLAP",
-		"KNOWLEDGECRAWLER_PROCESSING_LIMIT", "KNOWLEDGECRAWLER_REVIEW_LIMIT", "KNOWLEDGECRAWLER_WORKERS",
-		"KNOWLEDGECRAWLER_MAX_ATTEMPTS", "KNOWLEDGECRAWLER_JOB_LEASE", "KNOWLEDGECRAWLER_POLL_INTERVAL",
-		"KNOWLEDGECRAWLER_LOG_LEVEL", "KNOWLEDGECRAWLER_LOG_JSON", "KNOWLEDGECRAWLER_LOG_CONSOLE",
-		"KNOWLEDGECRAWLER_LOG_MAX_SIZE_MB", "KNOWLEDGECRAWLER_LOG_BACKUP_FILES", "KNOWLEDGECRAWLER_OBSIDIAN_DIR",
-		"KNOWLEDGECRAWLER_AUTO_EXPORT",
-	} {
+	names := []string{
+		"MEMPLUA_DATA_DIR", "MEMPLUA_LANGUAGE", "MEMPLUA_API_LISTEN",
+		"MEMPLUA_API_TOKEN", "MEMPLUA_API_TOKEN_FILE", "MEMPLUA_API_ALLOWED_ORIGIN",
+		"MEMPLUA_LLAMA_BINARY", "MEMPLUA_LLM_MODEL", "MEMPLUA_LLM_URL",
+		"MEMPLUA_WHISPER_MODEL", "MEMPLUA_SILERO_MODEL", "MEMPLUA_ONNX_RUNTIME",
+		"MEMPLUA_MODEL_CONTEXT_SIZE", "MEMPLUA_MODEL_GPU_LAYERS",
+		"MEMPLUA_MODEL_PARALLEL", "MEMPLUA_LLAMA_SERVER_ARGS",
+		"MEMPLUA_MODEL_MAX_TOKENS", "MEMPLUA_MODEL_TEMPERATURE",
+		"MEMPLUA_MODEL_STARTUP_TIMEOUT", "MEMPLUA_MODEL_REQUEST_TIMEOUT",
+		"MEMPLUA_AUDIO_TICK_INTERVAL", "MEMPLUA_AUDIO_SEGMENT_LENGTH",
+		"MEMPLUA_AUDIO_TRANSCRIPTION_TIMEOUT",
+		"MEMPLUA_AUDIO_VAD_WINDOW", "MEMPLUA_AUDIO_VAD_THRESHOLD",
+		"MEMPLUA_WINDOW_SIZE", "MEMPLUA_OVERLAP",
+		"MEMPLUA_PROCESSING_LIMIT", "MEMPLUA_REVIEW_LIMIT", "MEMPLUA_WORKERS",
+		"MEMPLUA_MAX_ATTEMPTS", "MEMPLUA_JOB_LEASE", "MEMPLUA_POLL_INTERVAL",
+		"MEMPLUA_LOG_LEVEL", "MEMPLUA_LOG_JSON", "MEMPLUA_LOG_CONSOLE",
+		"MEMPLUA_LOG_MAX_SIZE_MB", "MEMPLUA_LOG_BACKUP_FILES", "MEMPLUA_OBSIDIAN_DIR",
+		"MEMPLUA_AUTO_EXPORT",
+	}
+	for _, current := range append(append([]string{}, names...), legacyEnvironmentNames(names)...) {
+		name := current
 		value, existed := os.LookupEnv(name)
 		if err := os.Unsetenv(name); err != nil {
 			t.Fatal(err)
 		}
-		name, value, existed := name, value, existed
+		cleanupName, cleanupValue, cleanupExisted := name, value, existed
 		t.Cleanup(func() {
-			if existed {
-				_ = os.Setenv(name, value)
+			if cleanupExisted {
+				_ = os.Setenv(cleanupName, cleanupValue)
 			} else {
-				_ = os.Unsetenv(name)
+				_ = os.Unsetenv(cleanupName)
 			}
 		})
 	}
+}
+
+func legacyEnvironmentNames(names []string) []string {
+	legacy := make([]string, 0, len(names))
+	for _, name := range names {
+		legacy = append(legacy, strings.Replace(name, "MEMPLUA_", "KNOWLEDGECRAWLER_", 1))
+	}
+	return legacy
 }

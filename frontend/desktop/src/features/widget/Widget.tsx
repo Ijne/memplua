@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { AudioLines, BrainCircuit, CircleAlert, GripVertical, Inbox, LoaderCircle, Mic, MicOff, Pause, Play, Settings, ShieldCheck, Square, VolumeX, X } from 'lucide-react';
+import { AudioLines, BrainCircuit, CircleAlert, GripVertical, Inbox, LoaderCircle, Mic, MicOff, Network, Pause, Play, Settings, ShieldCheck, Square, VolumeX, X } from 'lucide-react';
 import { Logo } from '../../components/Logo';
 import { api } from '../../lib/api';
 import { openWindow, quitApp, resizeWidget } from '../../lib/bridge';
 import type { UISource, UIState } from '../../lib/types';
 import styles from './Widget.module.css';
 
-const CLOSED_WIDTH = 363;
+const CLOSED_WIDTH = 409;
 const WIDGET_HEIGHT = 48;
 
 function elapsed(source: UISource, now: number) {
@@ -35,7 +35,7 @@ export function Widget({ connected = true }: { connected?: boolean }) {
     mutationFn: ({ source, action }: { source: UISource; action: string }) => api(action === 'start' ? `/api/v1/sources/${encodeURIComponent(source.id)}/start` : `/api/v1/source-sessions/${encodeURIComponent(source.session_id || '')}/${action}`, { method: 'POST' }),
     onSuccess: () => client.invalidateQueries({ queryKey: ['ui-state'] }),
   });
-  const showWindow = (name: 'review' | 'settings') => { setWindowError(false); void openWindow(name).catch(() => setWindowError(true)); };
+  const showWindow = (name: 'review' | 'settings' | 'graph') => { setWindowError(false); void openWindow(name).catch(() => setWindowError(true)); };
   useEffect(() => {
     if (!data?.sources.some(source => source.state === 'recording')) return;
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
@@ -43,7 +43,7 @@ export function Widget({ connected = true }: { connected?: boolean }) {
   }, [data?.sources]);
   const sources = ['microphone', 'loopback'].map(kind => data?.sources.find(source => source.id === kind || source.kind === kind));
   const expanded = sources.find((source, index) => expandedSource === (index ? 'loopback' : 'microphone') && source?.actions.some(action => ['start', 'pause', 'resume', 'stop'].includes(action)));
-  const widgetWidth = CLOSED_WIDTH + (expanded ? ['recording', 'paused'].includes(expanded.state) ? 112 : 46 : 0);
+  const widgetWidth = CLOSED_WIDTH + (expanded ? ['recording', 'paused'].includes(expanded.state) ? 112 : 36 : 0);
   useEffect(() => {
     const shrinking = widgetWidth < resizedWidth.current;
     resizedWidth.current = widgetWidth;
@@ -61,7 +61,7 @@ export function Widget({ connected = true }: { connected?: boolean }) {
   return <div className={styles.root} style={{ width: widgetWidth }}>
     <div className={styles.dock} role="toolbar" aria-label={t('widgetLabel')}>
       <div className={styles.dragHandle} title={t('dragWidget')} aria-hidden="true"><GripVertical /></div>
-      <div className={styles.brand} title="KnowledgeCrawler"><Logo size={29} activity={activity} /></div>
+      <div className={styles.brand} title="memplua"><Logo size={29} activity={activity} /></div>
       <div className={styles.separator} />
       {sources.map((source, index) => {
         const kind = index ? 'loopback' : 'microphone';
@@ -86,6 +86,7 @@ export function Widget({ connected = true }: { connected?: boolean }) {
       <button type="button" className={styles.control} data-state={processing} title={`${t('processing')} — ${t(`processState.${processing}`)}`} aria-label={t(`processState.${processing}`)}><BrainCircuit className={processing === 'working' ? styles.thinking : ''} /></button>
       <div className={styles.separator} />
       <button type="button" className={styles.inbox} title={t('inboxTooltip', { conspects: data?.pending_conspects || 0, items: data?.pending_items || 0 })} aria-label={`${t('review')}: ${data?.pending_conspects || 0}`} onClick={() => showWindow('review')}><Inbox /><span>{data?.pending_conspects || 0}</span></button>
+      <button type="button" className={styles.control} aria-label={t('graph')} title={t('graph')} onClick={() => showWindow('graph')}><Network /></button>
       <button type="button" className={`${styles.control} ${healthy ? styles.healthy : ''}`} data-state={data?.warning || failure ? 'failed' : healthy ? 'healthy' : 'starting'} title={healthLabel} aria-label={healthLabel}>{!data && state.isPending ? <LoaderCircle className="spin" /> : failure || data?.warning ? <CircleAlert /> : <ShieldCheck />}</button>
       <button type="button" className={styles.control} aria-label={t('settings')} title={t('settings')} onClick={() => showWindow('settings')}><Settings /></button>
       <button type="button" className={`${styles.control} ${styles.quit}`} aria-label={t('quit')} title={t('quit')} onClick={() => void quitApp()}><X /></button>

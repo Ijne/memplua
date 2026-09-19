@@ -7,7 +7,7 @@ async function connect(page: Page, language: 'en' | 'ru' = 'en', theme: 'light' 
   preferences.ui.language = language; preferences.ui.theme = theme;
   let applied = false;
   await page.addInitScript(({ language }) => {
-    window.__KC_DESKTOP__ = {
+    window.__MEMPLUA_DESKTOP__ = {
       Bootstrap: async () => ({ apiAddress: location.origin, token: 'browser-test-credential', locale: language, systemTheme: 'light', autostart: false }),
       OpenWindow: async (name, id) => { window.dispatchEvent(new CustomEvent('test:window', { detail: { name, id } })); },
       HideWindow: async () => {}, Quit: async () => {}, PickFile: async () => '', PickFolder: async () => '', SetAlwaysOnTop: async () => {}, SetAutostart: async () => {}, ResizeWidget: async () => {},
@@ -16,7 +16,7 @@ async function connect(page: Page, language: 'en' | 'ru' = 'en', theme: 'light' 
   await page.route('**/api/v1/**', async route => {
     const url = new URL(route.request().url()), path = url.pathname;
     expect(route.request().headers().authorization).toBe('Bearer browser-test-credential');
-    expect(route.request().headers()['x-knowledgecrawler-client']).toBe('desktop');
+    expect(route.request().headers()['x-memplua-client']).toBe('desktop');
     let value: unknown;
     if (path.endsWith('/events')) { await route.fulfill({ contentType: 'text/event-stream', body: ': connected\n\n' }); return; }
     if (path.endsWith('/ui/state')) value = state;
@@ -80,7 +80,11 @@ test('settings language, theme and keyboard tabs; source search; graph browsing'
   await page.setViewportSize({ width: 800, height: 640 }); await page.goto('/?window=source&conspect=note-1');
   await page.getByRole('searchbox').fill('consistency'); await expect(page.locator('mark')).toHaveCount(2);
   await expect(page).toHaveScreenshot('source-ru-dark.png');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.setViewportSize({ width: 1100, height: 720 }); await page.goto('/?window=graph'); await expect(page.getByRole('heading', { name: 'Граф знаний' })).toBeVisible();
+  await page.getByRole('button', { name: 'Раскрыть мысли' }).click();
+  await expect(page.getByRole('button', { name: /Мысль: Choose consistency/ })).toBeVisible();
+  await expect(page.getByRole('img', { name: 'Интерактивный граф знаний' }).locator('ellipse')).toHaveCount(1);
   await expect(page).toHaveScreenshot('graph-ru-dark.png');
 });
 test('minimum review window keeps actions reachable with reduced motion', async ({ page }) => {
@@ -91,14 +95,17 @@ test('minimum review window keeps actions reachable with reduced motion', async 
   await expect(page).toHaveScreenshot('review-minimum-ru-dark.png');
 });
 test('widget source controls expand right and move the following controls', async ({ page }) => {
-  await page.setViewportSize({ width: 475, height: 48 }); await connect(page); await page.goto('/?window=widget');
+  await page.setViewportSize({ width: 540, height: 48 }); await connect(page); await page.goto('/?window=widget');
+  await page.evaluate(() => { (window as unknown as { __openedWindows: string[] }).__openedWindows = []; window.addEventListener('test:window', event => (window as unknown as { __openedWindows: string[] }).__openedWindows.push((event as CustomEvent<{ name: string }>).detail.name)); });
+  await page.getByRole('button', { name: 'Knowledge graph', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __openedWindows: string[] }).__openedWindows)).toContain('graph');
   const sourceButton = page.getByRole('button', { name: 'Microphone: Off', exact: true });
   const nextSource = page.getByRole('button', { name: 'System audio: Off', exact: true });
   const sourceBefore = await sourceButton.boundingBox();
   const nextBefore = await nextSource.boundingBox();
   await sourceButton.hover();
   const microphone = page.getByLabel('Microphone', { exact: true });
-  await expect(microphone).toHaveCSS('width', '46px');
+  await expect(microphone).toHaveCSS('width', '36px');
   const startButton = microphone.getByRole('button', { name: 'Start recording' });
   await expect(startButton).toBeVisible();
   const sourceExpanded = await sourceButton.boundingBox();
@@ -107,7 +114,7 @@ test('widget source controls expand right and move the following controls', asyn
   expect(sourceBefore).not.toBeNull(); expect(nextBefore).not.toBeNull();
   expect(sourceExpanded?.x).toBe(sourceBefore?.x);
   expect(actionExpanded!.x).toBeGreaterThan(sourceExpanded!.x + sourceExpanded!.width - 1);
-  expect(nextExpanded!.x - nextBefore!.x).toBeCloseTo(46, 0);
+  expect(nextExpanded!.x - nextBefore!.x).toBeCloseTo(36, 0);
   await expect(page.locator('[role="toolbar"]')).toHaveScreenshot('widget-source.png');
   await startButton.click();
   await expect(page.getByRole('button', { name: 'Microphone: Recording' })).toBeVisible();
@@ -120,5 +127,5 @@ test('widget source controls expand right and move the following controls', asyn
   await expect(microphone).toHaveCSS('opacity', '0');
   const nextCollapsed = await nextSource.boundingBox();
   expect(nextCollapsed?.x).toBe(nextBefore?.x);
-  await expect(page.getByRole('button', { name: 'Quit KnowledgeCrawler', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Quit memplua', exact: true })).toBeVisible();
 });

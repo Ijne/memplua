@@ -21,6 +21,7 @@ called out explicitly and must not be inferred from the current contracts.
 - [Data model](data-model.md) — canonical graph, processing data, review data, jobs, events, and migrations.
 - [Configuration](configuration.md) — precedence, paths, every TOML section, and restart behavior.
 - [Runtime](runtime.md) — commands, startup, desktop windows, API/SSE, models, and shutdown.
+- [Windows installer](windows-installer.md) — per-user packaging, offline models, updates, and release prerequisites.
 - [Code reference](code-reference.md) — package-by-package guide to important types and functions.
 - [Development](development.md) — setup, build tags, tests, prompts, migrations, and contribution workflow.
 - [Troubleshooting](troubleshooting.md) — common startup, audio, LLM, pipeline, and export failures.

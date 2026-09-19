@@ -18,7 +18,7 @@ func NewLogger(cfg config.Logging) (*slog.Logger, io.Closer, error) {
 	if err := os.MkdirAll(cfg.Directory, 0700); err != nil {
 		return nil, nil, fmt.Errorf("create log directory: %w", err)
 	}
-	writer, err := newRotatingWriter(filepath.Join(cfg.Directory, "knowledgecrawler.log"), int64(cfg.MaxSizeMB)<<20, cfg.BackupFiles)
+	writer, err := newRotatingWriter(filepath.Join(cfg.Directory, "memplua.log"), int64(cfg.MaxSizeMB)<<20, cfg.BackupFiles)
 	if err != nil {
 		return nil, nil, err
 	}

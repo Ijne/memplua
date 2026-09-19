@@ -2,7 +2,7 @@
 
 ## Design goal
 
-KnowledgeCrawler keeps uncertain machine interpretation separate from trusted
+memplua keeps uncertain machine interpretation separate from trusted
 user knowledge. Realtime capture may lose an unfinished in-memory audio segment,
 but once text is stored as a chunk, every later transition is durable,
 retryable, and designed to be idempotent.
@@ -36,7 +36,7 @@ Domain packages define their own ports. Implementations depend inward on those
 contracts and are wired only in `internal/runtime`.
 
 ```text
-cmd/knowledgecrawler     internal/desktop
+cmd/memplua     internal/desktop
           \                 /
            internal/runtime                 composition
               /   |   \
@@ -60,7 +60,7 @@ production dependency.
 
 | Package | Owns | Must not own |
 |---|---|---|
-| `cmd/knowledgecrawler` | CLI parsing and command selection | business logic |
+| `cmd/memplua` | CLI parsing and command selection | business logic |
 | `internal/runtime` | object graph and resource ownership | domain rules |
 | `internal/app` | root lifecycle and source sessions | native capture details |
 | `internal/audio` | audio contracts and WASAPI capture | durable processing |

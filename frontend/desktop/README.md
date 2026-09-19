@@ -1,4 +1,4 @@
-# KnowledgeCrawler desktop frontend
+# memplua desktop frontend
 
 This directory contains the end-user React UI embedded by the Windows Wails
 shell. It is independent from the contributor browser panel in `internal/ui`.

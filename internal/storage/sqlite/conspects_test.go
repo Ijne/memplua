@@ -480,7 +480,7 @@ func TestBatchTimelineHasNoFocusOverlapAndBoundedUnicodeContext(t *testing.T) {
 			}
 			runes += utf8.RuneCountInString(c.Text)
 		}
-		if runes > 1500 {
+		if runes > 400 {
 			t.Fatal("context limit exceeded")
 		}
 		for _, c := range b.Input.Focus {
@@ -492,6 +492,24 @@ func TestBatchTimelineHasNoFocusOverlapAndBoundedUnicodeContext(t *testing.T) {
 	}
 	if len(seen) != 41 || countRows(t, s, `SELECT COUNT(*) FROM jobs WHERE kind='extract_analysis_batch'`) != 5 {
 		t.Fatal("lost focus or duplicate extraction job")
+	}
+}
+
+func TestContinuitySuffixKeepsOnlyUnfinishedBoundaryText(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+		stop  bool
+	}{
+		{"Завершённая мысль. Незавершённый переход", " Незавершённый переход", true},
+		{"Полностью завершено!", "", true},
+		{"фрагмент без пунктуации", "фрагмент без пунктуации", false},
+	}
+	for _, test := range tests {
+		got, stop := continuitySuffix(test.input)
+		if string(got) != test.want || stop != test.stop {
+			t.Fatalf("continuitySuffix(%q) = %q, %v; want %q, %v", test.input, string(got), stop, test.want, test.stop)
+		}
 	}
 }
 func stringsOfRunes(n int) string {

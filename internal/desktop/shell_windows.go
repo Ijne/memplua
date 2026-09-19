@@ -59,8 +59,8 @@ type BootstrapData struct {
 }
 
 const (
-	widgetClosedWidth = 363
-	widgetMaxWidth    = 475
+	widgetClosedWidth = 371
+	widgetMaxWidth    = 483
 	widgetHeight      = 48
 )
 
@@ -78,7 +78,7 @@ func Run(options appruntime.Options) error {
 	// Wails acquires its single-instance lock in New, before the runtime opens
 	// the API listener or database. Repeated launch only activates the widget.
 	shell.app = application.New(application.Options{
-		Name: "KnowledgeCrawler", Description: "A calm workspace for captured knowledge", Icon: brandIcon(256),
+		Name: "memplua", Description: "A calm workspace for captured knowledge", Icon: brandIcon(256),
 		Services:       []application.Service{application.NewService(shell)},
 		Assets:         application.AssetOptions{Handler: application.AssetFileServerFS(frontend), DisableLogging: true},
 		LogLevel:       slog.LevelWarn,
@@ -88,14 +88,14 @@ func Run(options appruntime.Options) error {
 	options.Desktop = true
 	shell.runtime, err = appruntime.New(options)
 	if err != nil {
-		message := "KnowledgeCrawler could not start. Check the configuration and the application log."
+		message := "memplua could not start. Check the configuration and the application log."
 		if errors.Is(err, syscall.Errno(10048)) {
-			message = "KnowledgeCrawler cannot use its local API port because another application is already using it. Close the other KnowledgeCrawler or headless instance, or choose a different API port in the configuration."
+			message = "memplua cannot use its local API port because another application is already using it. Close the other memplua or headless instance, or choose a different API port in the configuration."
 		}
 		if options.Config.UI.Language == "ru" {
-			message = "Не удалось запустить KnowledgeCrawler. Проверьте конфигурацию и журнал приложения."
+			message = "Не удалось запустить memplua. Проверьте конфигурацию и журнал приложения."
 			if errors.Is(err, syscall.Errno(10048)) {
-				message = "Локальный порт KnowledgeCrawler занят другим приложением. Закройте другой экземпляр KnowledgeCrawler или headless-сервер либо укажите другой порт API в конфигурации."
+				message = "Локальный порт memplua занят другим приложением. Закройте другой экземпляр memplua или headless-сервер либо укажите другой порт API в конфигурации."
 			}
 		}
 		showStartupError(message)
@@ -111,7 +111,7 @@ func Run(options appruntime.Options) error {
 	if err != nil {
 		cancel()
 		<-done
-		showStartupError("KnowledgeCrawler could not start its local service. Check the application log.")
+		showStartupError("memplua could not start its local service. Check the application log.")
 		return errors.Join(err, runtimeErr)
 	}
 	// Only the widget is needed at startup. The remaining windows are created
@@ -253,7 +253,7 @@ func (s *Shell) createWindow(name string) {
 		return
 	}
 	s.mu.Unlock()
-	options := application.WebviewWindowOptions{Name: name, Title: "KnowledgeCrawler", URL: "/?window=" + name, Hidden: true, Width: 800, Height: 640,
+	options := application.WebviewWindowOptions{Name: name, Title: "memplua", URL: "/?window=" + name, Hidden: true, Width: 800, Height: 640, Zoom: 1, ZoomControlEnabled: false,
 		BackgroundColour: application.NewRGB(247, 248, 252), Windows: application.WindowsWindow{Theme: application.SystemDefault}}
 	switch name {
 	case "widget":
@@ -269,13 +269,13 @@ func (s *Shell) createWindow(name string) {
 		options.BackgroundType = application.BackgroundTypeTransparent
 		options.BackgroundColour = application.NewRGBA(0, 0, 0, 0)
 	case "review":
-		options.Title, options.Width, options.Height, options.MinWidth, options.MinHeight = "KnowledgeCrawler · Review", 1180, 760, 960, 640
+		options.Title, options.Width, options.Height, options.MinWidth, options.MinHeight = "memplua · Review", 1180, 760, 960, 640
 	case "settings":
-		options.Title, options.Width, options.Height, options.MinWidth, options.MinHeight = "KnowledgeCrawler · Settings", 760, 700, 640, 580
+		options.Title, options.Width, options.Height, options.MinWidth, options.MinHeight = "memplua · Settings", 760, 700, 640, 580
 	case "source":
-		options.Title, options.MinWidth, options.MinHeight = "KnowledgeCrawler · Source text", 600, 420
+		options.Title, options.MinWidth, options.MinHeight = "memplua · Source text", 600, 420
 	case "graph":
-		options.Title, options.Width, options.Height, options.MinWidth, options.MinHeight = "KnowledgeCrawler · Knowledge graph", 1100, 720, 760, 520
+		options.Title, options.Width, options.Height, options.MinWidth, options.MinHeight = "memplua · Knowledge graph", 1100, 720, 760, 520
 	}
 	window := s.app.Window.NewWithOptions(options)
 	s.mu.Lock()
@@ -437,7 +437,7 @@ func (s *Shell) monitorDisplays(ctx context.Context) {
 func (s *Shell) createTray() {
 	tray := s.app.SystemTray.New()
 	tray.SetIcon(trayIcon())
-	tray.SetLabel("KnowledgeCrawler")
+	tray.SetLabel("memplua")
 	tray.OnClick(func() { _ = s.OpenWindow("widget", "") })
 	s.tray = tray
 	s.refreshTrayMenu()
@@ -549,12 +549,12 @@ func (s *Shell) actionFailed(err error) {
 	if s.runtime.Settings.Current().UI.Language == "ru" {
 		message = "Не удалось изменить состояние источника. Откройте виджет или настройки, чтобы проверить его состояние."
 	}
-	s.app.Dialog.Warning().SetTitle("KnowledgeCrawler").SetMessage(message).Show()
+	s.app.Dialog.Warning().SetTitle("memplua").SetMessage(message).Show()
 }
 
 func showStartupError(message string) {
 	user32 := syscall.NewLazyDLL("user32.dll")
 	text, _ := syscall.UTF16PtrFromString(message)
-	title, _ := syscall.UTF16PtrFromString("KnowledgeCrawler")
+	title, _ := syscall.UTF16PtrFromString("memplua")
 	_, _, _ = user32.NewProc("MessageBoxW").Call(0, uintptr(unsafe.Pointer(text)), uintptr(unsafe.Pointer(title)), 0x10)
 }

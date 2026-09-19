@@ -19,7 +19,7 @@ func TestEmbeddedControlPanel(t *testing.T) {
 
 	page := httptest.NewRecorder()
 	handler.ServeHTTP(page, httptest.NewRequest(http.MethodGet, "/ui/", nil))
-	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), "KnowledgeCrawler") {
+	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), "memplua") {
 		t.Fatalf("page = %d %q", page.Code, page.Body.String())
 	}
 	if !strings.Contains(page.Header().Get("Content-Security-Policy"), "default-src 'self'") {

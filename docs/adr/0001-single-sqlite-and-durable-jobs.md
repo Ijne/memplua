@@ -9,7 +9,7 @@ Realtime-захват, LLM и UI имеют разные скорости и м�
 
 ## Решение
 
-Production использует новый `knowledgecrawler.db` с последовательными миграциями. Processing (`chunks`, `conspects`, `jobs`), review и canonical graph находятся в одной SQLite, но разделены таблицами и транзакционными границами. После записи chunk все дальнейшие стадии представлены durable jobs с lease, attempts, `available_at` и `last_error`.
+Production использует новый `knowledge.db` с последовательными миграциями. Processing (`chunks`, `conspects`, `jobs`), review и canonical graph находятся в одной SQLite, но разделены таблицами и транзакционными границами. После записи chunk все дальнейшие стадии представлены durable jobs с lease, attempts, `available_at` и `last_error`.
 
 Прототипная `.sqlite/db.db` не импортируется и не перезаписывается. WAL, foreign keys и один пул соединений дают предсказуемую сериализацию записей. Истёкший lease возвращается в retry при следующем claim; отменяемый worker освобождает lease сразу.
 

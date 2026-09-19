@@ -100,7 +100,7 @@ func (c *LlamaClient) Extract(ctx context.Context, input ingest.BatchInput) (ing
 		language = c.languageProvider()
 	}
 	prompt := prompts.Build(language, input, taxonomyNames(tags))
-	content, err := c.complete(ctx, prompt, true)
+	content, err := c.completeInLanguage(ctx, prompt, true, language)
 	if err != nil {
 		return ingest.Extraction{}, content, err
 	}
@@ -112,6 +112,10 @@ func (c *LlamaClient) Extract(ctx context.Context, input ingest.BatchInput) (ing
 }
 
 func (c *LlamaClient) complete(ctx context.Context, userPrompt string, cache bool) (string, error) {
+	return c.completeInLanguage(ctx, userPrompt, cache, c.language)
+}
+
+func (c *LlamaClient) completeInLanguage(ctx context.Context, userPrompt string, cache bool, language string) (string, error) {
 	if c.lifecycle != nil {
 		if err := c.lifecycle.WaitReady(ctx); err != nil {
 			return "", fmt.Errorf("%w: wait for llama-server: %v", ingest.ErrBackpressure, err)
@@ -124,7 +128,7 @@ func (c *LlamaClient) complete(ctx context.Context, userPrompt string, cache boo
 		return "", ctx.Err()
 	}
 	requestBody, err := json.Marshal(completionRequest{
-		Prompt: formatChatML(userPrompt), Temperature: c.temperature, MaxTokens: c.completionTokenLimit(),
+		Prompt: formatChatML(userPrompt, language), Temperature: c.temperature, MaxTokens: c.completionTokenLimit(),
 		Stop: []string{"<|im_end|>", "\n\n\n"}, Stream: true, CachePrompt: cache,
 	})
 	if err != nil {
@@ -302,8 +306,12 @@ func extractJSON(text string) string {
 	return candidate
 }
 
-func formatChatML(prompt string) string {
-	return "<|im_start|>system\nOutput ONLY valid JSON. No markdown or explanations.<|im_end|>\n" +
+func formatChatML(prompt, language string) string {
+	languageRule := "Write every human-readable JSON field in English."
+	if language == "ru" {
+		languageRule = "Все человекочитаемые поля JSON пиши на русском языке. Английский допустим только внутри общепринятых имён и технических терминов."
+	}
+	return "<|im_start|>system\nOutput ONLY valid JSON. No markdown or explanations. " + languageRule + "<|im_end|>\n" +
 		"<|im_start|>user\n" + prompt + "\n/no_think<|im_end|>\n<|im_start|>assistant\n"
 }
 

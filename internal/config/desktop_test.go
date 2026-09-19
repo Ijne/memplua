@@ -7,7 +7,7 @@ import (
 )
 
 func TestDesktopPreferencesAndLegacyLanguageRoundTrip(t *testing.T) {
-	clearKnowledgeCrawlerEnvironment(t)
+	clearMempluaEnvironment(t)
 	path := filepath.Join(t.TempDir(), "config.toml")
 	if err := os.WriteFile(path, []byte("language = \"en\"\n[ui]\nlanguage = \"ru\"\ntheme = \"dark\"\nalways_on_top = false\nstart_with_windows = true\n[conspect]\nlanguage = \"ru\"\n"), 0600); err != nil {
 		t.Fatal(err)

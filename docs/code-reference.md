@@ -4,7 +4,7 @@ This is a guide to responsibilities and important entry points, not a duplicate
 of generated Go documentation. Run `go doc -all ./internal/<package>` for exact
 signatures and read interface comments next to the code.
 
-## `cmd/knowledgecrawler`
+## `cmd/memplua`
 
 - `main` prints terminal errors and returns a non-zero exit status.
 - `run` selects `desktop` by default and dispatches subcommands.

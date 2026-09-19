@@ -1,6 +1,6 @@
 # Configuration reference
 
-KnowledgeCrawler has one typed TOML configuration. The authoritative defaults
+memplua has one typed TOML configuration. The authoritative defaults
 and validation rules are in `internal/config/config.go`; an annotated complete
 file is available as `config.example.toml`.
 
@@ -10,11 +10,13 @@ Values are composed in this order:
 
 1. compiled defaults;
 2. TOML file;
-3. `KNOWLEDGECRAWLER_*` environment variables;
+3. `MEMPLUA_*` environment variables;
 4. command-line overrides (`--config`, `--data-dir`, and `--listen` where
    supported).
 
-The default config path is `%AppData%\KnowledgeCrawler\config.toml` on Windows.
+The default config path is `%AppData%\memplua\config.toml` on Windows. When an
+older `%AppData%\KnowledgeCrawler\config.toml` exists and the new path does not,
+memplua keeps using the legacy file so its database and model paths remain intact.
 If that file does not exist, defaults are still usable, but model paths must be
 configured before native/model features become available.
 
@@ -77,7 +79,7 @@ to TOML or browser storage.
 
 The application owns model, host, port, context, GPU-layer, and parallel flags.
 Those flags are rejected inside `server_args` to prevent contradictory launches.
-With `managed=false`, KnowledgeCrawler never starts or stops the external model
+With `managed=false`, memplua never starts or stops the external model
 process, but still waits for its health before inference.
 
 ## `[audio]`
@@ -131,14 +133,14 @@ export after a graph revision; manual exports remain available regardless.
 
 ## Environment variables
 
-The supported names are the fields above prefixed with `KNOWLEDGECRAWLER_`.
+The supported names are the fields above prefixed with `MEMPLUA_`.
 Notable mappings include `DATA_DIR`, `DATABASE`, `UI_LANGUAGE`,
 `CONSPECT_LANGUAGE`, `API_LISTEN`, `LLAMA_BINARY`, `LLM_MODEL`, `LLM_URL`,
 `WHISPER_MODEL`, `SILERO_MODEL`, `ONNX_RUNTIME`, `MODEL_*`, `AUDIO_*`,
 `CONSPECT_*`, `PROCESSING_LIMIT`, `REVIEW_LIMIT`, `WORKERS`, `MAX_ATTEMPTS`,
 `JOB_LEASE`, `POLL_INTERVAL`, `LOG_*`, `OBSIDIAN_DIR`, and `AUTO_EXPORT`.
 
-`KNOWLEDGECRAWLER_LLAMA_SERVER_ARGS` is a JSON string array. Booleans use Go
+`MEMPLUA_LLAMA_SERVER_ARGS` is a JSON string array. Booleans use Go
 boolean syntax; durations use Go duration syntax such as `500ms`, `45s`, or
 `10m`.
 

@@ -4,7 +4,7 @@ param(
 	[ValidateSet("Release", "Debug")]
 	[string]$Configuration = "Release",
 
-    [string]$Output = "knowledgecrawler.exe"
+    [string]$Output = "memplua.exe"
 )
 
 $ErrorActionPreference = "Stop"
@@ -13,7 +13,7 @@ $ProjectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "../.."))
 
 Push-Location $ProjectRoot
 try {
-    go build -tags native -o $Output ./cmd/knowledgecrawler
+    go build -tags native -o $Output ./cmd/memplua
     if ($LASTEXITCODE -ne 0) {
         throw "go build failed with exit code $LASTEXITCODE"
     }

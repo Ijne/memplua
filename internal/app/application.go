@@ -94,7 +94,7 @@ func (a *Application) Run(ctx context.Context) error {
 		return fmt.Errorf("start app run: %w", err)
 	}
 	a.setState(StateRunning)
-	a.publish(runContext, observability.SeverityInfo, "application.started", "KnowledgeCrawler started")
+	a.publish(runContext, observability.SeverityInfo, "application.started", "memplua started")
 
 	group, groupContext := errgroup.WithContext(runContext)
 	if a.sources != nil {
@@ -117,7 +117,7 @@ func (a *Application) Run(ctx context.Context) error {
 		a.logger.Error("application stopped with error", "app_run_id", run.ID, "error", err)
 		a.publish(context.Background(), observability.SeverityError, "application.failed", err.Error())
 	} else {
-		a.publish(context.Background(), observability.SeverityInfo, "application.stopped", "KnowledgeCrawler stopped")
+		a.publish(context.Background(), observability.SeverityInfo, "application.stopped", "memplua stopped")
 	}
 	if finishErr := a.store.FinishAppRun(context.Background(), run.ID, finalState, err); finishErr != nil && err == nil {
 		err = finishErr

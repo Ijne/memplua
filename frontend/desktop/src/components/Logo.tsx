@@ -1,12 +1,11 @@
 import styles from './Logo.module.css';
 export function Logo({ size = 32, activity = 'idle' }: { size?: number; activity?: string }) {
-  return <svg width={size} height={size} viewBox="0 0 40 40" fill="none" aria-hidden="true" className={styles.logo} data-activity={activity}>
-    <path d="M9 27V19H18L22 24V28M16 20L28 11L30 14L20 24" fill="currentColor" />
-    <rect x="4" y="27" width="23" height="9" rx="4.5" fill="currentColor" />
-    <path d="M10 31.5H21" stroke="var(--surface)" strokeWidth="2" strokeLinecap="round" />
-    <g className={styles.wheel} fill="var(--accent)">
-      <path d="M27 3H32V7L35 5L38 9L35 12L39 13L38 18L34 17L34 21H29V17L25 20L22 16L25 13L21 12L22 7L26 8Z" />
-      <circle cx="30" cy="12" r="3.5" fill="var(--surface)" /><circle cx="30" cy="12" r="1.5" />
+  return <svg width={size} height={size} viewBox="87 99 338 338" aria-hidden="true" className={styles.logo} data-activity={activity}>
+    <g fill="currentColor" transform="translate(-60 133.5)">
+      <path d="M148 202.5C132.5 191.8 202.5 98.5 227.5 98.5C253 98.5 270.5 202.5 227.5 202.5H148Z" />
+      <path d="M274.2 68C285.1 61.2 371.5 176.6 353.3 186.6C344.5 191.5 323 202.5 316 202.5C308.5 202.5 269 82 223.2 97C217.2 99 252.3 82 263.3 75C266.9 72.7 270.6 70.3 274.2 68Z" />
+      <path d="M411.5 202.5C403 202.5 323 109.5 323 96C323 63.5 411.5 42.5 411.5 96.5V202.5Z" />
+      <circle className={styles.point} cx="452" cy="171" r="32.5" />
     </g>
   </svg>;
 }

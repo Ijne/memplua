@@ -3,9 +3,9 @@ requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"
 
 [project]
-name = "knowledgecrawler-research"
+name = "memplua-research"
 version = "0.1.0"
-description = "Contributor-only dataset preparation, LoRA training, and evaluation tools for KnowledgeCrawler"
+description = "Contributor-only dataset preparation, LoRA training, and evaluation tools for memplua"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = []
@@ -19,7 +19,7 @@ train = [
 ]
 
 [project.scripts]
-knowledgecrawler-research = "knowledgecrawler_research.cli:main"
+memplua-research = "memplua_research.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/knowledgecrawler_research"]
+packages = ["src/memplua_research"]

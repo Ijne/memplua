@@ -1,5 +1,5 @@
 {
-  "name": "knowledgecrawler-ui-tests",
+  "name": "memplua-ui-tests",
   "private": true,
   "scripts": {
     "test": "node --test review.test.cjs"

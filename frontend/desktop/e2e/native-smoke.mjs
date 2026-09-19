@@ -7,14 +7,14 @@ import { resolve, join } from 'node:path';
 import { createServer } from 'node:net';
 import assert from 'node:assert/strict';
 
-const executable = resolve(process.argv[2] || '../../.cache/knowledgecrawler-desktop.exe');
+const executable = resolve(process.argv[2] || '../../.cache/memplua-desktop.exe');
 const directory = resolve('../../.cache/native-smoke', String(Date.now()));
 await mkdir(directory, { recursive: true });
 await writeFile(join(directory, 'config.toml'), '[models]\nmanaged = false\n[logging]\nconsole = false\n[ui]\nlanguage = "en"\nstart_with_windows = false\n');
 async function freePort() { const server = createServer(); await new Promise(resolve => server.listen(0, '127.0.0.1', resolve)); const port = server.address().port; await new Promise(resolve => server.close(resolve)); return port; }
 const apiPort = await freePort(), debugPort = await freePort();
-const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('KNOWLEDGECRAWLER_')));
-env.KNOWLEDGECRAWLER_DESKTOP_DEBUG_PORT = String(debugPort);
+const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('MEMPLUA_')));
+env.MEMPLUA_DESKTOP_DEBUG_PORT = String(debugPort);
 const args = ['--config', join(directory, 'config.toml'), '--data-dir', directory, '--listen', `127.0.0.1:${apiPort}`];
 const child = spawn(executable, args, { env, windowsHide: true, stdio: 'ignore' });
 child.on('error', () => {});
@@ -26,12 +26,12 @@ try {
   browser = await chromium.connectOverCDP(`http://127.0.0.1:${debugPort}`);
   const context = browser.contexts()[0];
   const widget = await until(async () => context.pages().find(page => page.url().includes('window=widget')));
-  await widget.getByRole('toolbar', { name: 'KnowledgeCrawler controls' }).waitFor({ timeout: 20000 });
+  await widget.getByRole('toolbar', { name: 'memplua controls' }).waitFor({ timeout: 20000 });
   assert.equal(await widget.getByRole('button', { name: 'Microphone: Off', exact: true }).count(), 1);
   const bridgeOK = await widget.evaluate(async () => {
     const { Call } = await import('/wails/runtime.js');
     const boot = await Call.ByName('crawler/internal/desktop.Shell.Bootstrap');
-    const response = await fetch(`${boot.apiAddress}/api/v1/ui/state`, { headers: { Authorization: `Bearer ${boot.token}`, 'X-KnowledgeCrawler-Client': 'desktop' } });
+    const response = await fetch(`${boot.apiAddress}/api/v1/ui/state`, { headers: { Authorization: `Bearer ${boot.token}`, 'X-Memplua-Client': 'desktop' } });
     const state = await response.json();
     return response.ok && state.sources.every(source => source.state === 'off') && !JSON.stringify({ ...localStorage, ...sessionStorage }).includes(boot.token);
   });

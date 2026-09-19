@@ -105,7 +105,7 @@ type BatchPolicy struct {
 }
 
 // DefaultBatchPolicy returns production batching defaults.
-func DefaultBatchPolicy() BatchPolicy { return BatchPolicy{5 * time.Minute, 90 * time.Second, 1500} }
+func DefaultBatchPolicy() BatchPolicy { return BatchPolicy{5 * time.Minute, 90 * time.Second, 400} }
 
 // ConspectStatus describes progress through review and application.
 type ConspectStatus string

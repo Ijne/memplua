@@ -47,6 +47,7 @@ func TestParseExtractionRejectsLegacyAndMalformedShape(t *testing.T) {
 		t.Fatalf("empty result: %v %s", err, normalized)
 	}
 }
+
 func TestExtractionMakesOneRequestForThreeTopics(t *testing.T) {
 	calls := 0
 	response := ingest.Extraction{Conspects: []ingest.TopicExtraction{}}

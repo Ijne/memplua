@@ -1,9 +1,11 @@
 {
-  "name": "knowledgecrawler-desktop",
-  "version": "0.1.0",
+  "name": "memplua-desktop",
+  "version": "0.2.0-alpha.2",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22.12.0" },
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "node scripts/icons.mjs && tsc --noEmit && vite build",
@@ -33,7 +35,7 @@
     "@vitejs/plugin-react": "5.1.4",
     "jsdom": "28.1.0",
     "typescript": "5.9.3",
-    "vite": "7.3.1",
-    "vitest": "4.0.18"
+    "vite": "7.3.6",
+    "vitest": "4.1.11"
   }
 }

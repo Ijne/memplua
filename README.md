@@ -1,6 +1,6 @@
-# KnowledgeCrawler
+# memplua
 
-KnowledgeCrawler is a Windows-first, local-first application that turns live
+memplua is a Windows-first, local-first application that turns live
 speech and submitted text into a user-approved knowledge graph.
 
 The application captures microphone or system-loopback audio, transcribes it
@@ -9,9 +9,9 @@ local LLM to extract topical conspects. Nothing enters the canonical graph until
 the user reviews every proposed term and thought and applies the complete
 conspect in one transaction.
 
-> Project status: post-prototype, under active development. The storage and
-> review safety boundaries are implemented; packaging, automatic model
-> installation, and long-running Windows release hardening are not complete.
+> Project status: **Alpha v2 (`0.2.0-alpha.2`)**. The storage and review safety
+> boundaries, Windows desktop UI, online installer, and verified model setup are
+> implemented. Long-running Windows release hardening is still in progress.
 
 ## Why the review boundary matters
 
@@ -57,7 +57,17 @@ LLM-generated operation.
 - Windows desktop UI, developer web panel, REST API, and replayable SSE events;
 - RU/EN UI and conspect language settings.
 
-## Quick start
+## Install on Windows
+
+Build or download the `memplua-0.2.0-alpha.2-windows-x64-setup.exe` release
+artifact and run it as the current user. The compact installer downloads the
+local CPU inference stack from its official publishers, verifies every artifact,
+and then launches memplua. The first installation downloads about 2.8 GB.
+
+See [Windows installer](docs/windows-installer.md) for packaging and diagnostic
+details.
+
+## Build from source
 
 Requirements:
 
@@ -80,7 +90,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
   -File ./scripts/dev/build-desktop.ps1 `
   -Native -WhisperRoot C:/path/to/whisper.cpp
 
-./knowledgecrawler.exe --config ./config.toml
+./memplua.exe --config ./config.toml
 ```
 
 The desktop UI does not ask for an API key. It receives a per-process local
@@ -97,11 +107,11 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 ## Commands
 
 ```text
-knowledgecrawler [desktop]  Start the Windows desktop application (default).
-knowledgecrawler serve      Start the headless runtime and developer web panel.
-knowledgecrawler doctor     Validate directories, models, and native assets.
-knowledgecrawler export     Export the current canonical graph to Obsidian.
-knowledgecrawler version    Print the build version.
+memplua [desktop]  Start the Windows desktop application (default).
+memplua serve      Start the headless runtime and developer web panel.
+memplua doctor     Validate directories, models, and native assets.
+memplua export     Export the current canonical graph to Obsidian.
+memplua version    Print the build version.
 ```
 
 All commands accept `--config`. Run a command with `-h` for its exact flags.
@@ -119,8 +129,10 @@ Start with the [documentation map](docs/README.md).
 - [Development and testing](docs/development.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Privacy and security model](docs/privacy-security.md)
+- [Windows installer and verified model setup](docs/windows-installer.md)
 - [REST/SSE OpenAPI contract](api/openapi.yaml)
 - [Architecture decisions](docs/adr/)
+- [Release notes](CHANGELOG.md)
 - [Русское введение](README.ru.md)
 
 ## Development checks

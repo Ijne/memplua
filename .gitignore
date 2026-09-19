@@ -16,6 +16,7 @@
 /chunks/
 /conspects/
 /obsidian/
+/.memplua/
 /.knowledgecrawler/
 /.cache/
 /.tmp-*/
@@ -53,3 +54,12 @@ knowledge.db
 knowledge.db-wal
 knowledge.db-shm
 node_modules/
+/build/
+/dist/
+
+# Unrelated website prototype and local packaging scratch output
+/website
+/dest
+
+# Local scratch notes
+TODO

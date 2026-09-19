@@ -3,7 +3,7 @@
 Start with:
 
 ```powershell
-./knowledgecrawler.exe doctor --config ./config.toml
+./memplua.exe doctor --config ./config.toml
 ```
 
 Then inspect the newest rotating log under the configured logging directory.
@@ -24,7 +24,7 @@ reviewing them for private data.
 ## `bind: Only one usage of each socket address`
 
 Another process owns the configured API port. Find and stop the other
-KnowledgeCrawler/headless process, or choose another loopback port. Do not work
+memplua/headless process, or choose another loopback port. Do not work
 around this by binding a public network interface.
 
 ## Browser panel asks for a token
@@ -57,10 +57,10 @@ code, device type, and sanitized nearby log fields in a bug report.
 
 Check `models.llama_binary` and `models.llm_model` paths relative to the config
 and data directory rules. For managed mode, `llm_url` must be loopback HTTP with
-an explicit port. `server_args` cannot repeat flags owned by KnowledgeCrawler.
+an explicit port. `server_args` cannot repeat flags owned by memplua.
 
 If GPU offload is unavailable, set `gpu_layers = 0` or install a compatible
-llama-server build. KnowledgeCrawler reports configuration failure as a user
+llama-server build. memplua reports configuration failure as a user
 event while keeping settings/review available.
 
 ## “Organizing ideas” never finishes
@@ -95,10 +95,10 @@ affected items again.
 
 - Verify `export.obsidian_directory` is writable.
 - Stop another exporter targeting the same directory.
-- Only files in `.knowledgecrawler-manifest.json` are owned; unrelated files are
+- Only files in `.memplua-manifest.json` are owned; unrelated files are
   intentionally untouched.
 - Export is downstream of graph commit. Retry the export job or use
-  `knowledgecrawler export --target obsidian`; do not re-apply the conspect.
+  `memplua export --target obsidian`; do not re-apply the conspect.
 
 ## Config reports an unknown key
 

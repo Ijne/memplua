@@ -4,7 +4,8 @@ param(
     [string]$WhisperRoot = "",
     [ValidateSet("Release", "Debug")]
     [string]$Configuration = "Release",
-    [string]$Output = "knowledgecrawler.exe",
+    [string]$Output = "memplua.exe",
+    [string]$Version = "",
     [switch]$SkipFrontend
 )
 
@@ -14,6 +15,9 @@ $FrontendRoot = Join-Path $ProjectRoot "frontend/desktop"
 
 if ($Native -and $CoreOnly) {
     throw "-Native and -CoreOnly cannot be used together"
+}
+if (-not $WhisperRoot -and $env:MEMPLUA_WHISPER_ROOT) {
+    $WhisperRoot = $env:MEMPLUA_WHISPER_ROOT
 }
 if (-not $WhisperRoot -and $env:KNOWLEDGECRAWLER_WHISPER_ROOT) {
     $WhisperRoot = $env:KNOWLEDGECRAWLER_WHISPER_ROOT
@@ -30,12 +34,12 @@ if (-not $CoreOnly -and $WhisperRoot) {
 
 if ($Native) {
     if ([string]::IsNullOrWhiteSpace($WhisperRoot)) {
-        throw "-Native requires -WhisperRoot or KNOWLEDGECRAWLER_WHISPER_ROOT pointing to the external Whisper build."
+        throw "-Native requires -WhisperRoot or MEMPLUA_WHISPER_ROOT pointing to the external Whisper build."
     }
     . (Join-Path $PSScriptRoot "native-env.ps1") -WhisperRoot $WhisperRoot -Configuration $Configuration
     Write-Output "Native audio: enabled ($WhisperRoot)"
 } else {
-    Write-Warning "Native audio is disabled. microphone and loopback will be unavailable; provide -WhisperRoot or KNOWLEDGECRAWLER_WHISPER_ROOT, or omit -CoreOnly."
+    Write-Warning "Native audio is disabled. microphone and loopback will be unavailable; provide -WhisperRoot or MEMPLUA_WHISPER_ROOT, or omit -CoreOnly."
 }
 
 if (-not $SkipFrontend) {
@@ -61,8 +65,12 @@ try {
     # Preserve the existing native-env.ps1 Whisper linking configuration.
     # The release subsystem avoids a console window for ordinary desktop launch.
     $BuildArguments = @("build", "-tags", $BuildTags, "-o", $Output)
-    if ($Configuration -eq "Release") { $BuildArguments += @("-trimpath", "-ldflags", "-H windowsgui") }
-    $BuildArguments += "./cmd/knowledgecrawler"
+    $LinkerFlags = @()
+    if ($Configuration -eq "Release") { $LinkerFlags += "-H windowsgui" }
+    if (-not [string]::IsNullOrWhiteSpace($Version)) { $LinkerFlags += "-X main.version=$Version" }
+    if ($Configuration -eq "Release") { $BuildArguments += "-trimpath" }
+    if ($LinkerFlags.Count -gt 0) { $BuildArguments += @("-ldflags", ($LinkerFlags -join " ")) }
+    $BuildArguments += "./cmd/memplua"
     & go @BuildArguments
     if ($LASTEXITCODE -ne 0) { throw "desktop build failed with exit code $LASTEXITCODE" }
 } finally { Pop-Location }

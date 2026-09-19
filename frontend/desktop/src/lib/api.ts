@@ -7,7 +7,7 @@ export function authenticatedFetch(path: string, init: RequestInit = {}) {
   if (!connection) throw new ApiError(503, 'disconnected');
   const headers = new Headers(init.headers);
   headers.set('Authorization', `Bearer ${connection.token}`);
-  headers.set('X-KnowledgeCrawler-Client', 'desktop');
+  headers.set('X-Memplua-Client', 'desktop');
   if (init.body) headers.set('Content-Type', 'application/json');
   return fetch(`${connection.address}${path}`, { ...init, headers, credentials: 'omit', cache: 'no-store' });
 }

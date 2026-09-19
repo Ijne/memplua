@@ -201,7 +201,7 @@ func (s *Server) Handler() http.Handler {
 
 func (s *Server) middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
-		if request.Header.Get("X-KnowledgeCrawler-Client") == "desktop" || request.URL.Query().Get("view") == "desktop" || request.URL.Path == "/api/v1/ui/state" || strings.HasSuffix(request.URL.Path, "/source-text") {
+		if isDesktopClient(request) || request.URL.Query().Get("view") == "desktop" || request.URL.Path == "/api/v1/ui/state" || strings.HasSuffix(request.URL.Path, "/source-text") {
 			safe := &desktopErrors{ResponseWriter: response}
 			response = safe
 			defer safe.finish(s)
@@ -215,7 +215,7 @@ func (s *Server) middleware(next http.Handler) http.Handler {
 			response.Header().Set("Vary", "Origin")
 		}
 		if request.Method == http.MethodOptions {
-			response.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, Last-Event-ID, X-KnowledgeCrawler-Client")
+			response.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, Last-Event-ID, X-Memplua-Client, X-KnowledgeCrawler-Client")
 			response.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, OPTIONS")
 			response.WriteHeader(http.StatusNoContent)
 			return
@@ -230,6 +230,11 @@ func (s *Server) middleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(response, request)
 	})
+}
+
+func isDesktopClient(request *http.Request) bool {
+	return request.Header.Get("X-Memplua-Client") == "desktop" ||
+		request.Header.Get("X-KnowledgeCrawler-Client") == "desktop"
 }
 
 func sameOrigin(request *http.Request, origin string) bool {
@@ -290,7 +295,7 @@ func (s *Server) startSource(response http.ResponseWriter, request *http.Request
 		writeError(response, http.StatusConflict, err.Error())
 		return
 	}
-	if request.Header.Get("X-KnowledgeCrawler-Client") == "desktop" {
+	if isDesktopClient(request) {
 		session.LastError = ""
 	}
 	writeJSON(response, http.StatusAccepted, session)
@@ -306,7 +311,7 @@ func (s *Server) resumeSource(response http.ResponseWriter, request *http.Reques
 		writeError(response, http.StatusConflict, err.Error())
 		return
 	}
-	if request.Header.Get("X-KnowledgeCrawler-Client") == "desktop" {
+	if isDesktopClient(request) {
 		session.LastError = ""
 	}
 	writeJSON(response, http.StatusAccepted, session)

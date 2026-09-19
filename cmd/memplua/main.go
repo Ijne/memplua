@@ -63,7 +63,7 @@ func serve(arguments []string) error {
 	}
 	defer host.Close()
 	fmt.Printf("Configuration: %s\n", options.ConfigPath)
-	fmt.Printf("KnowledgeCrawler UI: %s/ui/\n", host.APIAddress)
+	fmt.Printf("memplua UI: %s/ui/\n", host.APIAddress)
 	fmt.Printf("API token file: %s\n", options.Config.API.TokenFile)
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()

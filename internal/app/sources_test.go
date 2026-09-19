@@ -16,7 +16,7 @@ import (
 )
 
 func TestNamedSourcesAreIndependentlyPausedResumedAndStopped(t *testing.T) {
-	store, err := sqlite.Open(filepath.Join(t.TempDir(), "knowledgecrawler.db"))
+	store, err := sqlite.Open(filepath.Join(t.TempDir(), "memplua.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

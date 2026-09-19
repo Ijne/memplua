@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
-  title: KnowledgeCrawler Local API
+  title: memplua Local API
   version: 1.0.0
-  description: Loopback-only REST/SSE API. Desktop clients send X-KnowledgeCrawler-Client=desktop for safe localized error codes; the developer UI contracts remain available. Every API endpoint except /healthz requires the local bearer token.
+  description: Loopback-only REST/SSE API. Desktop clients send X-Memplua-Client=desktop for safe localized error codes; the developer UI contracts remain available. Every API endpoint except /healthz requires the local bearer token.
 servers:
   - url: http://127.0.0.1:7331
 security:
