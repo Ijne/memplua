@@ -60,6 +60,15 @@ if ((Get-Content -LiteralPath $DesktopIndex -Raw) -notmatch '<script[^>]+src=') 
 
 $BuildTags = "desktop,production"
 if ($Native) { $BuildTags += ",native" }
+$ResourceScript = Join-Path $ProjectRoot "installer/windows/memplua.rc"
+$ResourceObject = Join-Path $ProjectRoot "cmd/memplua/memplua_windows_amd64.syso"
+$WindRes = Get-Command windres.exe -ErrorAction SilentlyContinue
+if (-not $WindRes) {
+    throw "windres.exe was not found; it is required to embed the branded Windows icon."
+}
+& $WindRes.Source "--target=pe-x86-64" "--input=$ResourceScript" "--output=$ResourceObject" "--output-format=coff" "--include-dir=$(Split-Path $ResourceScript -Parent)"
+if ($LASTEXITCODE -ne 0) { throw "windres failed with exit code $LASTEXITCODE" }
+
 Push-Location $ProjectRoot
 try {
     # Preserve the existing native-env.ps1 Whisper linking configuration.
@@ -71,6 +80,10 @@ try {
     if ($Configuration -eq "Release") { $BuildArguments += "-trimpath" }
     if ($LinkerFlags.Count -gt 0) { $BuildArguments += @("-ldflags", ($LinkerFlags -join " ")) }
     $BuildArguments += "./cmd/memplua"
-    & go @BuildArguments
-    if ($LASTEXITCODE -ne 0) { throw "desktop build failed with exit code $LASTEXITCODE" }
+    try {
+        & go @BuildArguments
+        if ($LASTEXITCODE -ne 0) { throw "desktop build failed with exit code $LASTEXITCODE" }
+    } finally {
+        if (Test-Path -LiteralPath $ResourceObject) { Remove-Item -LiteralPath $ResourceObject -Force }
+    }
 } finally { Pop-Location }

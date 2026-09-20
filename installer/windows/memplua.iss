@@ -7,6 +7,9 @@
 #define AppName "memplua"
 #define AppPublisher "memplua contributors"
 #define AppExeName "memplua.exe"
+#ifndef OfflinePayload
+  #error OfflinePayload must point to the prepared offline application payload.
+#endif
 
 [Setup]
 AppId={{8BF0957B-84D8-4C4E-B85A-C3BBC8D0C01E}
@@ -22,14 +25,15 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0.17763
 OutputDir={#OutputDir}
-OutputBaseFilename=memplua-{#AppVersion}-windows-x64-setup
+OutputBaseFilename=memplua-{#AppVersion}-windows-x64-offline-setup
 Compression=lzma2/fast
 SolidCompression=no
 WizardStyle=modern
 SetupLogging=yes
 CloseApplications=yes
 RestartApplications=no
-UninstallDisplayIcon={app}\{#AppExeName}
+SetupIconFile=memplua.ico
+UninstallDisplayIcon={app}\memplua.ico
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -39,10 +43,11 @@ Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
+Source: "memplua.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#LibGomp}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#LibWinPThread}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#LibStdCpp}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\..\scripts\release\download-windows-models.ps1"; DestDir: "{tmp}"; DestName: "download-models.ps1"; Flags: deleteafterinstall
+Source: "{#OfflinePayload}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 #ifdef VCRedist
 Source: "{#VCRedist}"; DestDir: "{tmp}"; DestName: "vc_redist.x64.exe"; Flags: deleteafterinstall
@@ -52,8 +57,8 @@ Source: "{#WebView2Bootstrapper}"; DestDir: "{tmp}"; DestName: "MicrosoftEdgeWeb
 #endif
 
 [Icons]
-Name: "{autoprograms}\memplua"; Filename: "{app}\{#AppExeName}"
-Name: "{autodesktop}\memplua"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
+Name: "{autoprograms}\memplua"; Filename: "{app}\{#AppExeName}"; IconFilename: "{app}\memplua.ico"
+Name: "{autodesktop}\memplua"; Filename: "{app}\{#AppExeName}"; IconFilename: "{app}\memplua.ico"; Tasks: desktopicon
 
 [Run]
 #ifdef VCRedist
@@ -62,34 +67,27 @@ Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; S
 #ifdef WebView2Bootstrapper
 Filename: "{tmp}\MicrosoftEdgeWebview2Setup.exe"; Parameters: "/silent /install"; StatusMsg: "Installing Microsoft Edge WebView2 Runtime..."; Flags: runhidden waituntilterminated
 #endif
-Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,memplua}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,memplua}"; Flags: nowait postinstall skipifsilent; Check: CanLaunchMemplua
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\models"
 Type: filesandordirs; Name: "{app}\runtime"
 
-[CustomMessages]
-english.DownloadingModels=Downloading the latest memplua release and required local models. This can take several minutes.
-english.ModelsDownloadFailed=memplua or required models could not be installed. Check model-install.log in the application directory, correct the network issue, and run the setup again.
-russian.DownloadingModels=Загружается последний релиз memplua и необходимые локальные модели. Это может занять несколько минут.
-russian.ModelsDownloadFailed=Не удалось установить memplua или необходимые модели. Откройте model-install.log в папке приложения, устраните проблему с сетью и запустите установщик снова.
-
 [Code]
-procedure CurStepChanged(CurStep: TSetupStep);
 var
-  ResultCode: Integer;
-  Parameters: String;
-begin
-  if CurStep <> ssPostInstall then
-    exit;
+  ApplicationInstalled: Boolean;
 
-  WizardForm.StatusLabel.Caption := ExpandConstant('{cm:DownloadingModels}');
-  Parameters := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ' +
-    AddQuotes(ExpandConstant('{tmp}\download-models.ps1')) + ' -ApplicationDirectory ' +
-    AddQuotes(ExpandConstant('{app}')) + ' -LogPath ' +
-    AddQuotes(ExpandConstant('{app}\model-install.log'));
-  if not Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'), Parameters, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
-    RaiseException(ExpandConstant('{cm:ModelsDownloadFailed}'));
-  if ResultCode <> 0 then
-    RaiseException(ExpandConstant('{cm:ModelsDownloadFailed}'));
+function CanLaunchMemplua: Boolean;
+begin
+  Result := ApplicationInstalled and FileExists(ExpandConstant('{app}\{#AppExeName}'));
+end;
+
+procedure InitializeWizard;
+begin
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssPostInstall then
+    ApplicationInstalled := True;
 end;

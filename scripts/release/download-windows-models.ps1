@@ -3,6 +3,7 @@ param(
     [Parameter(Mandatory)]
     [ValidateNotNullOrEmpty()]
     [string]$ApplicationDirectory,
+    [string]$AssetsDirectory = "",
     [string]$LogPath = ""
 )
 
@@ -11,6 +12,7 @@ param(
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 $ApplicationDirectory = [IO.Path]::GetFullPath($ApplicationDirectory)
+$AssetsDirectory = if ($AssetsDirectory) { [IO.Path]::GetFullPath($AssetsDirectory) } else { $ApplicationDirectory }
 if (-not $LogPath) { $LogPath = Join-Path $ApplicationDirectory "model-install.log" }
 $LogPath = [IO.Path]::GetFullPath($LogPath)
 
@@ -19,7 +21,16 @@ function Write-InstallLog([string]$Message) {
 }
 
 function Invoke-SourceRequest([string]$Uri) {
-    Invoke-RestMethod -Uri $Uri -Headers @{ "User-Agent" = "memplua-installer"; "Accept" = "application/json" } -UseBasicParsing
+    $lastError = $null
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        try {
+            return Invoke-RestMethod -Uri $Uri -Headers @{ "User-Agent" = "memplua-installer"; "Accept" = "application/json" } -UseBasicParsing
+        } catch {
+            $lastError = $_
+            if ($attempt -lt 3) { Start-Sleep -Seconds 2 }
+        }
+    }
+    throw $lastError
 }
 
 function Get-GitHubReleaseAsset([string]$Repository, [string]$NamePattern) {
@@ -47,11 +58,38 @@ function Get-GitHubLatestReleaseAsset([string]$Repository, [string]$Name) {
 }
 
 function Get-HuggingFaceFile([string]$Repository, [string]$Path) {
-    $file = @(@(Invoke-SourceRequest "https://huggingface.co/api/models/$Repository/tree/main?recursive=true&expand=true") | Where-Object { $_.path -eq $Path } | Select-Object -First 1)
+    $file = @(Invoke-SourceRequest "https://huggingface.co/api/models/$Repository/tree/main?recursive=true&expand=true" | Where-Object { $_.path -eq $Path })
     if ($file.Count -ne 1 -or $file[0].lfs.oid -notmatch "^[0-9a-fA-F]{64}$") {
         throw "No SHA-256 model metadata was returned for $Repository/$Path."
     }
-    [PSCustomObject]@{ Name = $Path; URL = "https://huggingface.co/$Repository/resolve/main/$Path?download=true"; SHA256 = $file[0].lfs.oid.ToLowerInvariant() }
+    [PSCustomObject]@{ Name = $Path; URL = "https://huggingface.co/$Repository/resolve/main/$Path?download=true"; SHA256 = $file[0].lfs.oid.ToLowerInvariant(); Size = [int64]($file[0].lfs.size); HuggingFaceRepository = $Repository; HuggingFacePath = $Path }
+}
+
+function Download-HuggingFaceByRanges([PSCustomObject]$Artifact, [string]$Destination, [string]$CurlPath) {
+    if (-not $Artifact.Size -or $Artifact.Size -lt 1) { throw "No file size was returned for $($Artifact.Name)." }
+    $chunkPath = "$Destination.range.part"
+    $chunkSize = [int64](32MB)
+    $output = [IO.File]::Open($Destination, [IO.FileMode]::Create, [IO.FileAccess]::Write, [IO.FileShare]::None)
+    try {
+        for ($offset = [int64]0; $offset -lt $Artifact.Size; $offset += $chunkSize) {
+            $end = [Math]::Min($offset + $chunkSize - 1, $Artifact.Size - 1)
+            $expectedLength = $end - $offset + 1
+            Remove-Item -LiteralPath $chunkPath -Force -ErrorAction SilentlyContinue
+            $separator = if ($Artifact.URL.Contains("?")) { "&" } else { "?" }
+            $rangeUri = "$($Artifact.URL)$separator`_memplua_range=$offset"
+            & $CurlPath "--fail" "--location" "--silent" "--show-error" "--range" "$offset-$end" "--output" $chunkPath $rangeUri
+            if ($LASTEXITCODE -ne 0) { throw "curl.exe exited with code $LASTEXITCODE while downloading bytes $offset-$end of $($Artifact.Name)." }
+            if (-not (Test-Path -LiteralPath $chunkPath) -or (Get-Item -LiteralPath $chunkPath).Length -ne $expectedLength) {
+                throw "The ranged response for $($Artifact.Name) had an unexpected length."
+            }
+            $input = [IO.File]::OpenRead($chunkPath)
+            try { $input.CopyTo($output) } finally { $input.Dispose() }
+            Write-InstallLog "Downloaded bytes $offset-$end of $($Artifact.Name)."
+        }
+    } finally {
+        $output.Dispose()
+        Remove-Item -LiteralPath $chunkPath -Force -ErrorAction SilentlyContinue
+    }
 }
 
 function Download-VerifiedFile([PSCustomObject]$Artifact, [string]$Destination) {
@@ -63,7 +101,19 @@ function Download-VerifiedFile([PSCustomObject]$Artifact, [string]$Destination) 
         try {
             Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue
             Write-InstallLog "Downloading $($Artifact.Name), attempt $attempt of 3."
-            Invoke-WebRequest -Uri $Artifact.URL -OutFile $temporary -MaximumRedirection 10 -UseBasicParsing -Headers @{ "User-Agent" = "memplua-installer" }
+            # Request a fresh redirect from hosts such as Hugging Face on every
+            # retry; otherwise a proxy can replay an expired storage redirect.
+            $requestUri = if ($Artifact.URL.Contains("?")) { "$($Artifact.URL)&_memplua_attempt=$attempt" } else { "$($Artifact.URL)?_memplua_attempt=$attempt" }
+            $curl = Get-Command "curl.exe" -ErrorAction SilentlyContinue
+            if ($curl -and $Artifact.HuggingFaceRepository) {
+                Write-InstallLog "Using ranged Hugging Face download for $($Artifact.Name)."
+                Download-HuggingFaceByRanges $Artifact $temporary $curl.Source
+            } elseif ($curl) {
+                & $curl.Source "--fail" "--location" "--silent" "--show-error" "--retry" "2" "--retry-all-errors" "--range" "0-" "--output" $temporary $requestUri
+                if ($LASTEXITCODE -ne 0) { throw "curl.exe exited with code $LASTEXITCODE for $($Artifact.Name)." }
+            } else {
+                Invoke-WebRequest -Uri $requestUri -OutFile $temporary -MaximumRedirection 10 -UseBasicParsing -Headers @{ "User-Agent" = "memplua-installer" }
+            }
             $actual = (Get-FileHash -LiteralPath $temporary -Algorithm SHA256).Hash.ToLowerInvariant()
             if ($actual -ne $Artifact.SHA256) { throw "SHA-256 mismatch for $($Artifact.Name)." }
             Move-Item -LiteralPath $temporary -Destination $Destination -Force
@@ -151,15 +201,78 @@ function Install-StagedItems([object[]]$Items) {
     }
 }
 
+function Write-ConfiguredModelPaths([string]$AssetRoot) {
+    $configBase = [Environment]::GetFolderPath([Environment+SpecialFolder]::ApplicationData)
+    if (-not $configBase) { $configBase = $env:LOCALAPPDATA }
+    if (-not $configBase) { throw "The per-user configuration directory could not be resolved." }
+    $current = Join-Path $configBase "memplua/config.toml"
+    $legacy = Join-Path $configBase "KnowledgeCrawler/config.toml"
+    $configPath = if (Test-Path -LiteralPath $current) { $current } elseif (Test-Path -LiteralPath $legacy) { $legacy } else { $current }
+    $values = [ordered]@{
+        llama_binary = (Join-Path $AssetRoot "runtime/llama/llama-server.exe")
+        llm_model = (Join-Path $AssetRoot "models/llm.gguf")
+        whisper_model = (Join-Path $AssetRoot "models/whisper.bin")
+        silero_model = (Join-Path $AssetRoot "models/silero.onnx")
+        onnx_runtime = (Join-Path $AssetRoot "runtime/onnxruntime.dll")
+    }
+    $lines = if (Test-Path -LiteralPath $configPath) { @(Get-Content -LiteralPath $configPath) } else { @() }
+    $result = New-Object System.Collections.Generic.List[string]
+    $inModels = $false
+    $modelsSeen = $false
+    $written = @{}
+    $writeMissing = {
+        foreach ($key in $values.Keys) {
+            if (-not $written.ContainsKey($key)) {
+                $result.Add(('{0} = {1}' -f $key, (ConvertTo-Json -InputObject $values[$key] -Compress)))
+                $written[$key] = $true
+            }
+        }
+    }
+    foreach ($line in $lines) {
+        if ($line -match '^\s*\[([^\]]+)\]\s*(?:#.*)?$') {
+            if ($inModels) { & $writeMissing }
+            $inModels = $Matches[1].Trim() -eq "models"
+            if ($inModels) { $modelsSeen = $true }
+            $result.Add($line)
+            continue
+        }
+        if ($inModels -and $line -match '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=') {
+            $key = $Matches[1]
+            if ($values.Contains($key)) {
+                $result.Add(('{0} = {1}' -f $key, (ConvertTo-Json -InputObject $values[$key] -Compress)))
+                $written[$key] = $true
+                continue
+            }
+        }
+        $result.Add($line)
+    }
+    if ($inModels) { & $writeMissing }
+    if (-not $modelsSeen) {
+        if ($result.Count -gt 0) { $result.Add("") }
+        $result.Add("[models]")
+        & $writeMissing
+    }
+    New-Item -ItemType Directory -Path (Split-Path -Parent $configPath) -Force | Out-Null
+    $temporary = "$configPath.installer.tmp"
+    Set-Content -LiteralPath $temporary -Value $result -Encoding UTF8
+    if (Test-Path -LiteralPath $configPath) {
+        [IO.File]::Replace($temporary, $configPath, $null, $true)
+    } else {
+        [IO.File]::Move($temporary, $configPath)
+    }
+    Write-InstallLog "Configured model paths below $AssetRoot."
+}
+
 New-Item -ItemType Directory -Path $ApplicationDirectory -Force | Out-Null
+New-Item -ItemType Directory -Path $AssetsDirectory -Force | Out-Null
 Set-Content -LiteralPath $LogPath -Value "" -Encoding UTF8
-$staging = Join-Path $ApplicationDirectory ".model-download-$([Guid]::NewGuid().ToString('N'))"
+$staging = Join-Path $AssetsDirectory ".model-download-$([Guid]::NewGuid().ToString('N'))"
 try {
     New-Item -ItemType Directory -Path $staging -Force | Out-Null
     Write-InstallLog "Resolving the latest memplua release and model artifacts from their official publishers."
     $application = Get-GitHubLatestReleaseAsset "Ijne/Crawler" "memplua.exe"
-    $llama = Get-GitHubReleaseAsset "ggml-org/llama.cpp" "^llama-.*-bin-win-cpu-x64\\.zip$"
-    $onnx = Get-GitHubReleaseAsset "microsoft/onnxruntime" "^onnxruntime-win-x64-[0-9.]+\\.zip$"
+    $llama = Get-GitHubReleaseAsset "ggml-org/llama.cpp" '^llama-.*-bin-win-cpu-x64\.zip$'
+    $onnx = Get-GitHubReleaseAsset "microsoft/onnxruntime" '^onnxruntime-win-x64-[0-9.]+\.zip$'
     $llm = Get-HuggingFaceFile "Qwen/Qwen3-4B-GGUF" "Qwen3-4B-Q4_K_M.gguf"
     $whisper = Get-HuggingFaceFile "ggerganov/whisper.cpp" "ggml-small-q5_1.bin"
     $silero = Get-GitHubBlob "snakers4/silero-vad" "src/silero_vad/data/silero_vad.onnx"
@@ -181,12 +294,15 @@ try {
     if ($onnxRuntime.Count -ne 1) { throw "The ONNX Runtime archive did not contain exactly one onnxruntime.dll." }
     Install-StagedItems @(
         [PSCustomObject]@{ Source = Join-Path $staging "application/memplua.exe"; Destination = Join-Path $ApplicationDirectory "memplua.exe" }
-        [PSCustomObject]@{ Source = Split-Path -Parent $llamaServer[0].FullName; Destination = Join-Path $ApplicationDirectory "runtime/llama" }
-        [PSCustomObject]@{ Source = $onnxRuntime[0].FullName; Destination = Join-Path $ApplicationDirectory "runtime/onnxruntime.dll" }
-        [PSCustomObject]@{ Source = Join-Path $staging "models/llm.gguf"; Destination = Join-Path $ApplicationDirectory "models/llm.gguf" }
-        [PSCustomObject]@{ Source = Join-Path $staging "models/whisper.bin"; Destination = Join-Path $ApplicationDirectory "models/whisper.bin" }
-        [PSCustomObject]@{ Source = Join-Path $staging "models/silero.onnx"; Destination = Join-Path $ApplicationDirectory "models/silero.onnx" }
+        [PSCustomObject]@{ Source = Split-Path -Parent $llamaServer[0].FullName; Destination = Join-Path $AssetsDirectory "runtime/llama" }
+        [PSCustomObject]@{ Source = $onnxRuntime[0].FullName; Destination = Join-Path $AssetsDirectory "runtime/onnxruntime.dll" }
+        [PSCustomObject]@{ Source = Join-Path $staging "models/llm.gguf"; Destination = Join-Path $AssetsDirectory "models/llm.gguf" }
+        [PSCustomObject]@{ Source = Join-Path $staging "models/whisper.bin"; Destination = Join-Path $AssetsDirectory "models/whisper.bin" }
+        [PSCustomObject]@{ Source = Join-Path $staging "models/silero.onnx"; Destination = Join-Path $AssetsDirectory "models/silero.onnx" }
     )
+    if (-not [string]::Equals($AssetsDirectory, $ApplicationDirectory, [StringComparison]::OrdinalIgnoreCase)) {
+        Write-ConfiguredModelPaths $AssetsDirectory
+    }
     Write-InstallLog "All required models were installed successfully."
     Remove-Item -LiteralPath $LogPath -Force
 } catch {

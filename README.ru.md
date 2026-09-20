@@ -1,4 +1,6 @@
-# memplua
+<p align="center">
+  <img src="docs/assets/github-header.png" alt="memplua" width="100%">
+</p>
 
 **Ваши мысли, разговоры и открытия — сохранённые и упорядоченные.**
 
