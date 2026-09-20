@@ -20,7 +20,6 @@
 - `internal/api` is the loopback REST/SSE boundary for the future UI; keep `api/openapi.yaml` synchronized.
 - `internal/ui` is the embedded local control panel; it calls only authenticated API contracts and must not bypass review or storage boundaries.
 - `internal/observability` separates structured developer logs from durable user events.
-- `research` is contributor-only. Production Go must not import or launch it.
 
 ## Invariants
 

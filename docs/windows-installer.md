@@ -16,9 +16,11 @@ when no explicit model paths are configured.
 
 ## Build the online installer
 
-The setup executable contains only the desktop application and its small native
-audio runtime. During installation it downloads the required CPU model stack
-over HTTPS, directly from the projects that publish it:
+The setup executable is a small online bootstrapper. During installation it
+downloads `memplua.exe` from the `memplua.exe` asset of the latest
+[Ijne/Crawler GitHub release](https://github.com/Ijne/Crawler/releases), then
+downloads the required CPU model stack over HTTPS directly from the projects
+that publish it:
 
 - the latest SHA-256-attested Windows CPU release of [llama.cpp](https://github.com/ggml-org/llama.cpp/releases);
 - [Qwen3-4B Q4_K_M](https://huggingface.co/Qwen/Qwen3-4B-GGUF), published by Qwen;
@@ -26,14 +28,15 @@ over HTTPS, directly from the projects that publish it:
 - [Silero VAD](https://github.com/snakers4/silero-vad), published by Silero;
 - the latest SHA-256-attested Windows CPU release of [ONNX Runtime](https://github.com/microsoft/onnxruntime/releases).
 
-The installer verifies each archive/model before making it available to the
-application. If a download fails, setup stops without replacing an existing
-model set; `model-install.log` in the application directory contains the
-non-sensitive error details. The initial download is about 2.8 GB, so an
+The installer verifies the GitHub release executable, each archive, and each
+model before making it available to the application. If a download fails, setup
+stops without replacing the installed executable or model set;
+`model-install.log` in the application directory contains the non-sensitive
+error details. The initial download is about 2.8 GB, so an
 internet connection and sufficient free disk space are required.
 
 ```powershell
-.\scripts\release\build-windows-installer.ps1 -SkipFrontend
+.\scripts\release\build-windows-installer.ps1
 ```
 
 Inno Setup 6 is required. Optional `-VCRedist` and

@@ -81,10 +81,10 @@ test('settings language, theme and keyboard tabs; source search; graph browsing'
   await page.getByRole('searchbox').fill('consistency'); await expect(page.locator('mark')).toHaveCount(2);
   await expect(page).toHaveScreenshot('source-ru-dark.png');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.setViewportSize({ width: 1100, height: 720 }); await page.goto('/?window=graph'); await expect(page.getByRole('heading', { name: 'Граф знаний' })).toBeVisible();
-  await page.getByRole('button', { name: 'Раскрыть мысли' }).click();
-  await expect(page.getByRole('button', { name: /Мысль: Choose consistency/ })).toBeVisible();
-  await expect(page.getByRole('img', { name: 'Интерактивный граф знаний' }).locator('ellipse')).toHaveCount(1);
+  await page.setViewportSize({ width: 1100, height: 720 }); await page.goto('/?window=graph'); await expect(page.getByRole('heading', { name: 'Memory' })).toBeVisible();
+  await expect(page.getByRole('img', { name: 'Интерактивный граф знаний' }).getByRole('button', { name: /Мысль:/ })).toHaveCount(0);
+  await expect(page.getByRole('img', { name: 'Интерактивный граф знаний' }).locator('ellipse')).toHaveCount(0);
+  await expect(page.evaluate(() => document.documentElement.scrollHeight)).resolves.toBe(720);
   await expect(page).toHaveScreenshot('graph-ru-dark.png');
 });
 test('minimum review window keeps actions reachable with reduced motion', async ({ page }) => {

@@ -39,7 +39,6 @@ Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "{#AppExecutable}"; DestDir: "{app}"; DestName: "{#AppExeName}"; Flags: ignoreversion
 Source: "{#LibGomp}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#LibWinPThread}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#LibStdCpp}"; DestDir: "{app}"; Flags: ignoreversion
@@ -70,10 +69,10 @@ Type: filesandordirs; Name: "{app}\models"
 Type: filesandordirs; Name: "{app}\runtime"
 
 [CustomMessages]
-english.DownloadingModels=Downloading required local models from their official publishers. This can take several minutes.
-english.ModelsDownloadFailed=Required models could not be installed. Check model-install.log in the application directory, correct the network issue, and run the setup again.
-russian.DownloadingModels=Загружаются необходимые локальные модели с официальных источников. Это может занять несколько минут.
-russian.ModelsDownloadFailed=Не удалось установить необходимые модели. Откройте model-install.log в папке приложения, устраните проблему с сетью и запустите установщик снова.
+english.DownloadingModels=Downloading the latest memplua release and required local models. This can take several minutes.
+english.ModelsDownloadFailed=memplua or required models could not be installed. Check model-install.log in the application directory, correct the network issue, and run the setup again.
+russian.DownloadingModels=Загружается последний релиз memplua и необходимые локальные модели. Это может занять несколько минут.
+russian.ModelsDownloadFailed=Не удалось установить memplua или необходимые модели. Откройте model-install.log в папке приложения, устраните проблему с сетью и запустите установщик снова.
 
 [Code]
 procedure CurStepChanged(CurStep: TSetupStep);

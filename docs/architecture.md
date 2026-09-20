@@ -53,8 +53,7 @@ internal/observability                       logs and durable events
 ```
 
 No domain package imports the desktop frontend, HTTP server, SQLite driver, or
-Obsidian representation. `research/` is a separate Python project and is not a
-production dependency.
+Obsidian representation.
 
 ## Package ownership
 

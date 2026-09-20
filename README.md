@@ -1,168 +1,49 @@
 # memplua
 
-memplua is a Windows-first, local-first application that turns live
-speech and submitted text into a user-approved knowledge graph.
+**Your thoughts, conversations, and discoveries — remembered and organized.**
 
-The application captures microphone or system-loopback audio, transcribes it
-locally, groups non-overlapping text chunks into analysis batches, and asks a
-local LLM to extract topical conspects. Nothing enters the canonical graph until
-the user reviews every proposed term and thought and applies the complete
-conspect in one transaction.
+memplua is a personal knowledge companion that quietly works in the background. It listens to the sources you choose, turns useful information into clear notes, and helps you build a lasting collection of knowledge without constantly stopping to write everything down yourself.
 
-> Project status: **Alpha v2 (`0.2.0-alpha.2`)**. The storage and review safety
-> boundaries, Windows desktop UI, online installer, and verified model setup are
-> implemented. Long-running Windows release hardening is still in progress.
+> **Alpha v2** — memplua is actively evolving and is not yet intended for everyday production use.
 
-## Why the review boundary matters
+## Why memplua exists
 
-```text
-microphone / loopback / manual text
-                 |
-                 v
-        durable text chunks
-                 |
-                 v
-      non-overlapping analysis batch
-                 |
-                 v
-       local LLM extraction
-                 |
-                 v
-      one or more draft conspects
-                 |
-                 v
- deterministic matching + user review
-                 |
-                 v
-       atomic canonical graph update
-                 |
-                 v
-      Obsidian and future projections
-```
+Valuable ideas appear everywhere: during a lecture, a meeting, a video, a podcast, or an ordinary conversation. Capturing them by hand breaks your focus, while leaving them for later usually means losing them.
 
-The LLM cannot directly create, update, or delete canonical knowledge. It only
-produces candidates with source-chunk provenance. Deletion is not an
-LLM-generated operation.
+memplua is designed to close that gap. It collects information while you stay present, finds the important concepts and ideas, and prepares them for you to review when it is convenient.
 
-## Current capabilities
+## How it works
 
-- simultaneous named microphone and loopback sessions;
-- local Silero VAD and Whisper transcription;
-- managed or external llama.cpp-compatible inference server;
-- durable SQLite batches, leases, retries, recovery, and backpressure;
-- term/thought extraction with evidence provenance and universal tags;
-- per-entity create, update, keep-existing, reject, and split review;
-- transactional application with version-conflict rematching;
-- canonical graph queries and an Obsidian exporter with an ownership manifest;
-- Windows desktop UI, developer web panel, REST API, and replayable SSE events;
-- RU/EN UI and conspect language settings.
+1. **You choose what to capture.** Start listening to your microphone or computer audio when you want memplua to help.
+2. **memplua works in the background.** It recognizes speech, brings related ideas together, and turns them into a structured conspect.
+3. **You stay in control.** Nothing becomes part of your knowledge collection until you review and approve it.
+4. **Your knowledge grows over time.** New information can complement what you already know instead of creating an endless pile of duplicate notes.
+5. **Use it where it suits you.** Your approved knowledge can be exported to Obsidian, with more ways to explore it planned for the future.
 
-## Install on Windows
+## Designed around people, not raw transcripts
 
-Build or download the `memplua-0.2.0-alpha.2-windows-x64-setup.exe` release
-artifact and run it as the current user. The compact installer downloads the
-local CPU inference stack from its official publishers, verifies every artifact,
-and then launches memplua. The first installation downloads about 2.8 GB.
+memplua is not meant to produce another folder full of unedited recordings and text. Its goal is to help create concise, connected knowledge:
 
-See [Windows installer](docs/windows-installer.md) for packaging and diagnostic
-details.
+- important terms with understandable explanations;
+- ideas and conclusions worth remembering;
+- connections between related concepts;
+- tags that make knowledge easier to navigate;
+- references back to the original material when context is needed.
 
-## Build from source
+## Private by design
 
-Requirements:
+Speech recognition and language processing run locally on your computer. Your material remains under your control, and the application asks for your approval before changing your saved knowledge.
 
-- Windows 10/11;
-- Go 1.25.1 or newer;
-- Node.js 22.12 or newer for rebuilding the desktop frontend;
-- local llama-server, GGUF, Whisper, Silero, and ONNX Runtime files;
-- a built external `whisper.cpp` tree for native audio builds.
+## What memplua aims to become
 
-Copy and edit the example configuration:
+The long-term goal is a quiet personal memory layer: an assistant that can follow the information you choose to share with it, preserve the meaningful parts, and help you return to them later without demanding constant manual note-taking.
 
-```powershell
-Copy-Item config.example.toml config.toml
-```
+Today, the project already supports the complete journey from live audio to reviewed knowledge and Obsidian notes. The current Alpha is focused on making that experience more stable, natural, and comfortable for everyday use.
 
-Build and start the desktop application:
+## Project status
 
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass `
-  -File ./scripts/dev/build-desktop.ps1 `
-  -Native -WhisperRoot C:/path/to/whisper.cpp
+memplua is an early-stage project developed by a solo creator. Expect unfinished details and breaking changes while the core experience is refined.
 
-./memplua.exe --config ./config.toml
-```
+Interested in the implementation or contributing? See the [developer documentation](docs/README.md), [contribution guide](CONTRIBUTING.md), and [release notes](CHANGELOG.md).
 
-The desktop UI does not ask for an API key. It receives a per-process local
-session credential through the Wails bridge. The `serve` developer panel uses a
-token file because it runs in a normal browser.
-
-For a pure-Go build without audio capture:
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass `
-  -File ./scripts/dev/build-desktop.ps1 -CoreOnly
-```
-
-## Commands
-
-```text
-memplua [desktop]  Start the Windows desktop application (default).
-memplua serve      Start the headless runtime and developer web panel.
-memplua doctor     Validate directories, models, and native assets.
-memplua export     Export the current canonical graph to Obsidian.
-memplua version    Print the build version.
-```
-
-All commands accept `--config`. Run a command with `-h` for its exact flags.
-
-## Documentation
-
-Start with the [documentation map](docs/README.md).
-
-- [Architecture and package boundaries](docs/architecture.md)
-- [End-to-end processing and recovery](docs/pipeline.md)
-- [Domain model and SQLite ownership](docs/data-model.md)
-- [Configuration reference](docs/configuration.md)
-- [Runtime, desktop, API, and shutdown](docs/runtime.md)
-- [Code reference](docs/code-reference.md)
-- [Development and testing](docs/development.md)
-- [Troubleshooting](docs/troubleshooting.md)
-- [Privacy and security model](docs/privacy-security.md)
-- [Windows installer and verified model setup](docs/windows-installer.md)
-- [REST/SSE OpenAPI contract](api/openapi.yaml)
-- [Architecture decisions](docs/adr/)
-- [Release notes](CHANGELOG.md)
-- [Русское введение](README.ru.md)
-
-## Development checks
-
-```powershell
-go test ./...
-go test -race ./...
-go vet ./...
-
-npm.cmd --prefix frontend/desktop ci
-npm.cmd --prefix frontend/desktop run typecheck
-npm.cmd --prefix frontend/desktop test
-```
-
-Native audio and real model execution require a separate Windows integration
-run; ordinary Go tests do not require model files or CGO libraries.
-
-## Repository policy
-
-- Model weights, runtime data, transcripts, databases, datasets, checkpoints,
-  and generated vaults must not be committed.
-- The legacy prototype database and JSON files are never imported or deleted
-  automatically.
-- Production Go code must not import or execute contributor-only `research/`.
-- Obsidian is a projection, not the canonical store.
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) before changing a domain boundary or
-durability invariant.
-
-## License
-
-A public license has not yet been selected. Add an OSI-approved `LICENSE` file
-before publishing the repository; until then, copyright law reserves all rights.
+[Русская версия](README.ru.md)

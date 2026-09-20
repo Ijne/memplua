@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../../lib/api';
@@ -32,16 +32,18 @@ describe('knowledge graph', () => {
     vi.mocked(api).mockResolvedValue(snapshot);
   });
 
-  it('loads the prepared graph API and reveals thought nodes on demand', async () => {
+  it('keeps thoughts in the list and renders only terms as graph nodes', async () => {
     const user = userEvent.setup();
     renderGraph();
 
     expect(await screen.findByRole('button', { name: 'Term: Eventual consistency' })).toBeVisible();
-    expect(screen.queryByRole('button', { name: 'Thought: Pick guarantees per task' })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Memory' })).toBeVisible();
+    expect(within(screen.getByRole('img', { name: 'Interactive knowledge graph' })).queryByRole('button', { name: /Thought:/ })).not.toBeInTheDocument();
     expect(api).toHaveBeenCalledWith('/api/v1/graph', expect.objectContaining({ signal: expect.any(AbortSignal) }));
 
-    await user.click(screen.getByRole('button', { name: 'Reveal thoughts' }));
-    expect(screen.getByRole('button', { name: 'Thought: Pick guarantees per task' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: /Pick guarantees per task/ }));
+    expect(screen.getByRole('heading', { name: 'Pick guarantees per task' })).toBeVisible();
+    expect(screen.getByText('Different actions need different guarantees.')).toBeVisible();
   });
 
   it('filters the ordinary list by topic and opens a node detail', async () => {

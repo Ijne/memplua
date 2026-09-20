@@ -28,7 +28,6 @@ semantics, prompt JSON shape, security boundary, or public API.
 - Do not introduce machine-specific paths, model files, or external network
   requirements into production or ordinary tests.
 - Do not inspect or depend on a sibling llama.cpp checkout from production code.
-- Production Go must not import or launch `research/`.
 
 ## Setup and checks
 

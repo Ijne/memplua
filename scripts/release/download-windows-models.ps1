@@ -34,6 +34,18 @@ function Get-GitHubReleaseAsset([string]$Repository, [string]$NamePattern) {
     throw "No SHA-256 verified release asset matching $NamePattern was found in $Repository."
 }
 
+function Get-GitHubLatestReleaseAsset([string]$Repository, [string]$Name) {
+    $release = Invoke-SourceRequest "https://api.github.com/repos/$Repository/releases/latest"
+    $asset = @($release.assets | Where-Object { $_.name -eq $Name } | Select-Object -First 1)
+    if ($asset.Count -ne 1) {
+        throw "The latest release of $Repository does not contain $Name."
+    }
+    if ($asset[0].digest -notmatch "^sha256:([0-9a-fA-F]{64})$") {
+        throw "The latest $Name release asset does not expose a SHA-256 digest."
+    }
+    [PSCustomObject]@{ Name = $asset[0].name; URL = $asset[0].browser_download_url; SHA256 = $Matches[1].ToLowerInvariant() }
+}
+
 function Get-HuggingFaceFile([string]$Repository, [string]$Path) {
     $file = @(@(Invoke-SourceRequest "https://huggingface.co/api/models/$Repository/tree/main?recursive=true&expand=true") | Where-Object { $_.path -eq $Path } | Select-Object -First 1)
     if ($file.Count -ne 1 -or $file[0].lfs.oid -notmatch "^[0-9a-fA-F]{64}$") {
@@ -144,7 +156,8 @@ Set-Content -LiteralPath $LogPath -Value "" -Encoding UTF8
 $staging = Join-Path $ApplicationDirectory ".model-download-$([Guid]::NewGuid().ToString('N'))"
 try {
     New-Item -ItemType Directory -Path $staging -Force | Out-Null
-    Write-InstallLog "Resolving model artifacts from their official publishers."
+    Write-InstallLog "Resolving the latest memplua release and model artifacts from their official publishers."
+    $application = Get-GitHubLatestReleaseAsset "Ijne/Crawler" "memplua.exe"
     $llama = Get-GitHubReleaseAsset "ggml-org/llama.cpp" "^llama-.*-bin-win-cpu-x64\\.zip$"
     $onnx = Get-GitHubReleaseAsset "microsoft/onnxruntime" "^onnxruntime-win-x64-[0-9.]+\\.zip$"
     $llm = Get-HuggingFaceFile "Qwen/Qwen3-4B-GGUF" "Qwen3-4B-Q4_K_M.gguf"
@@ -152,6 +165,7 @@ try {
     $silero = Get-GitHubBlob "snakers4/silero-vad" "src/silero_vad/data/silero_vad.onnx"
     $llamaArchive = Join-Path $staging "llama.zip"
     $onnxArchive = Join-Path $staging "onnxruntime.zip"
+    Download-VerifiedFile $application (Join-Path $staging "application/memplua.exe")
     Download-VerifiedFile $llama $llamaArchive
     Download-VerifiedFile $onnx $onnxArchive
     Download-VerifiedFile $llm (Join-Path $staging "models/llm.gguf")
@@ -166,6 +180,7 @@ try {
     $onnxRuntime = @(Get-ChildItem -LiteralPath $onnxExtract -Filter "onnxruntime.dll" -File -Recurse)
     if ($onnxRuntime.Count -ne 1) { throw "The ONNX Runtime archive did not contain exactly one onnxruntime.dll." }
     Install-StagedItems @(
+        [PSCustomObject]@{ Source = Join-Path $staging "application/memplua.exe"; Destination = Join-Path $ApplicationDirectory "memplua.exe" }
         [PSCustomObject]@{ Source = Split-Path -Parent $llamaServer[0].FullName; Destination = Join-Path $ApplicationDirectory "runtime/llama" }
         [PSCustomObject]@{ Source = $onnxRuntime[0].FullName; Destination = Join-Path $ApplicationDirectory "runtime/onnxruntime.dll" }
         [PSCustomObject]@{ Source = Join-Path $staging "models/llm.gguf"; Destination = Join-Path $ApplicationDirectory "models/llm.gguf" }

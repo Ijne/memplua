@@ -11,12 +11,11 @@ cmd/                 executable composition/commands
 docs/                architecture and operations documentation
 frontend/desktop/    end-user React/Wails frontend source
 internal/            production Go packages
-research/            isolated contributor-only Python project
 scripts/dev/         local Windows build/run/smoke helpers
 ```
 
-Runtime data, models, generated desktop assets, databases, vault output,
-datasets, and checkpoints are not source code.
+Runtime data, models, generated desktop assets, databases, and vault output are
+not source code.
 
 ## Pure-Go workflow
 
