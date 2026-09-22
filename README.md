@@ -48,4 +48,8 @@ memplua is an early-stage project developed by a solo creator. Expect unfinished
 
 Interested in the implementation or contributing? See the [developer documentation](docs/README.md), [contribution guide](CONTRIBUTING.md), and [release notes](CHANGELOG.md).
 
+[HuggingFace](https://huggingface.co/ijne/memplua)
+
+[WebSite](https://memplua.space/)
+
 [Русская версия](README.ru.md)
