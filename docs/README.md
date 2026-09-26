@@ -7,7 +7,7 @@ called out explicitly and must not be inferred from the current contracts.
 
 | Reader | Start here | Then read |
 |---|---|---|
-| User testing the application | [Runtime](runtime.md) | [Configuration](configuration.md), [Troubleshooting](troubleshooting.md) |
+| User testing the application | [Install on Windows](installation.md) | [Configuration](configuration.md), [Troubleshooting](troubleshooting.md) |
 | Go contributor | [Architecture](architecture.md) | [Pipeline](pipeline.md), [Code reference](code-reference.md) |
 | UI contributor | [Runtime](runtime.md#desktop-ui) | [OpenAPI](../api/openapi.yaml), [desktop README](../frontend/desktop/README.md) |
 | Storage contributor | [Data model](data-model.md) | [Pipeline](pipeline.md), ADRs 0001/0002/0005 |
@@ -16,6 +16,7 @@ called out explicitly and must not be inferred from the current contracts.
 
 ## Documents
 
+- [Installation (English)](installation.md) / [Установка (русский)](installation.ru.md) — website installer, GitHub portable package, models, and checksums.
 - [Architecture](architecture.md) — dependency direction, package ownership, and invariants.
 - [Pipeline](pipeline.md) — every state transition from capture to export.
 - [Data model](data-model.md) — canonical graph, processing data, review data, jobs, events, and migrations.

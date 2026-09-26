@@ -71,6 +71,7 @@ func Run(options appruntime.Options) error {
 	defer cancel()
 	shell := &Shell{options: options, ctx: ctx, windows: map[string]*application.WebviewWindow{}, statePath: filepath.Join(options.Config.DataDir, "ui-state.json")}
 	shell.state = loadState(shell.statePath)
+	started := make(chan struct{})
 	frontend, err := fs.Sub(assets, "assets")
 	if err != nil {
 		return err
@@ -79,11 +80,19 @@ func Run(options appruntime.Options) error {
 	// the API listener or database. Repeated launch only activates the widget.
 	shell.app = application.New(application.Options{
 		Name: "memplua", Description: "A calm workspace for captured knowledge", Icon: brandIcon(256),
-		Services:       []application.Service{application.NewService(shell)},
-		Assets:         application.AssetOptions{Handler: application.AssetFileServerFS(frontend), DisableLogging: true},
-		LogLevel:       slog.LevelWarn,
-		Windows:        application.WindowsOptions{DisableQuitOnLastWindowClosed: true, WebviewUserDataPath: filepath.Join(options.Config.DataDir, "webview"), AdditionalBrowserArgs: debugBrowserArgs()},
-		SingleInstance: &application.SingleInstanceOptions{UniqueID: desktopInstanceID(), OnSecondInstanceLaunch: func(application.SecondInstanceData) { _ = shell.OpenWindow("widget", "") }},
+		Services: []application.Service{application.NewService(shell)},
+		Assets:   application.AssetOptions{Handler: application.AssetFileServerFS(frontend), DisableLogging: true},
+		LogLevel: slog.LevelWarn,
+		Windows:  application.WindowsOptions{DisableQuitOnLastWindowClosed: true, WebviewUserDataPath: filepath.Join(options.Config.DataDir, "webview"), AdditionalBrowserArgs: debugBrowserArgs()},
+		SingleInstance: &application.SingleInstanceOptions{UniqueID: desktopInstanceID(), OnSecondInstanceLaunch: func(application.SecondInstanceData) {
+			go func() {
+				select {
+				case <-started:
+					_ = shell.OpenWindow("widget", "")
+				case <-ctx.Done():
+				}
+			}()
+		}},
 	})
 	options.Desktop = true
 	shell.runtime, err = appruntime.New(options)
@@ -114,13 +123,15 @@ func Run(options appruntime.Options) error {
 		showStartupError("memplua could not start its local service. Check the application log.")
 		return errors.Join(err, runtimeErr)
 	}
-	// Only the widget is needed at startup. The remaining windows are created
-	// on demand, avoiding several simultaneous WebView/API bootstraps.
-	shell.createWindow("widget")
+	// Create the first window after Wails starts. A hidden window created before
+	// Run can still be pending when ApplicationStarted fires; Show then only runs
+	// that window and returns without making it visible.
 	shell.createTray()
 	shell.app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
-		shell.restoreWindows()
-		_ = shell.OpenWindow("widget", "")
+		if err := shell.OpenWindow("widget", ""); err != nil {
+			shell.runtime.Logger.Error("open startup widget", "error", err)
+		}
+		close(started)
 		if enabled, readErr := shell.app.Autostart.IsEnabled(); readErr == nil && enabled != options.Config.UI.StartWithWindows {
 			if err := shell.SetAutostart(options.Config.UI.StartWithWindows); err != nil {
 				shell.runtime.Logger.Warn("apply configured autostart", "error", err)
@@ -195,6 +206,11 @@ func (s *Shell) OpenWindow(name, conspectID string) error {
 	}
 	window.UnMinimise()
 	window.Show()
+	// Win32 may ignore the first ShowWindow call in favor of STARTUPINFO's
+	// SW_HIDE (for example when launched by a hidden parent process).
+	if !window.IsVisible() {
+		window.Show()
+	}
 	window.Focus()
 	return nil
 }

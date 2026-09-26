@@ -4,7 +4,8 @@ param(
     [ValidateNotNullOrEmpty()]
     [string]$ApplicationDirectory,
     [string]$AssetsDirectory = "",
-    [string]$LogPath = ""
+    [string]$LogPath = "",
+    [switch]$ModelsOnly
 )
 
 # Run by the installer, not by the application. Artifact choices stay here so
@@ -201,7 +202,7 @@ function Install-StagedItems([object[]]$Items) {
     }
 }
 
-function Write-ConfiguredModelPaths([string]$AssetRoot) {
+function Write-ConfiguredModelPaths([string]$AssetRoot, [string]$RuntimeRoot) {
     $configBase = [Environment]::GetFolderPath([Environment+SpecialFolder]::ApplicationData)
     if (-not $configBase) { $configBase = $env:LOCALAPPDATA }
     if (-not $configBase) { throw "The per-user configuration directory could not be resolved." }
@@ -209,11 +210,11 @@ function Write-ConfiguredModelPaths([string]$AssetRoot) {
     $legacy = Join-Path $configBase "KnowledgeCrawler/config.toml"
     $configPath = if (Test-Path -LiteralPath $current) { $current } elseif (Test-Path -LiteralPath $legacy) { $legacy } else { $current }
     $values = [ordered]@{
-        llama_binary = (Join-Path $AssetRoot "runtime/llama/llama-server.exe")
+        llama_binary = (Join-Path $RuntimeRoot "runtime/llama/llama-server.exe")
         llm_model = (Join-Path $AssetRoot "models/llm.gguf")
         whisper_model = (Join-Path $AssetRoot "models/whisper.bin")
         silero_model = (Join-Path $AssetRoot "models/silero.onnx")
-        onnx_runtime = (Join-Path $AssetRoot "runtime/onnxruntime.dll")
+        onnx_runtime = (Join-Path $RuntimeRoot "runtime/onnxruntime.dll")
     }
     $lines = if (Test-Path -LiteralPath $configPath) { @(Get-Content -LiteralPath $configPath) } else { @() }
     $result = New-Object System.Collections.Generic.List[string]
@@ -265,43 +266,64 @@ function Write-ConfiguredModelPaths([string]$AssetRoot) {
 
 New-Item -ItemType Directory -Path $ApplicationDirectory -Force | Out-Null
 New-Item -ItemType Directory -Path $AssetsDirectory -Force | Out-Null
+if ($ModelsOnly) {
+    foreach ($requiredFile in @(
+        (Join-Path $ApplicationDirectory "memplua.exe"),
+        (Join-Path $ApplicationDirectory "runtime/onnxruntime.dll"),
+        (Join-Path $ApplicationDirectory "runtime/llama/llama-server.exe")
+    )) {
+        if (-not (Test-Path -LiteralPath $requiredFile -PathType Leaf)) {
+            throw "Portable application runtime is incomplete: $requiredFile"
+        }
+    }
+}
 Set-Content -LiteralPath $LogPath -Value "" -Encoding UTF8
 $staging = Join-Path $AssetsDirectory ".model-download-$([Guid]::NewGuid().ToString('N'))"
 try {
     New-Item -ItemType Directory -Path $staging -Force | Out-Null
-    Write-InstallLog "Resolving the latest memplua release and model artifacts from their official publishers."
-    $application = Get-GitHubLatestReleaseAsset "Ijne/Crawler" "memplua.exe"
-    $llama = Get-GitHubReleaseAsset "ggml-org/llama.cpp" '^llama-.*-bin-win-cpu-x64\.zip$'
-    $onnx = Get-GitHubReleaseAsset "microsoft/onnxruntime" '^onnxruntime-win-x64-[0-9.]+\.zip$'
+    Write-InstallLog $(if ($ModelsOnly) { "Resolving required model artifacts from their official publishers." } else { "Resolving the latest memplua release and model artifacts from their official publishers." })
+    if (-not $ModelsOnly) {
+        $application = Get-GitHubLatestReleaseAsset "Ijne/Crawler" "memplua.exe"
+        $llama = Get-GitHubReleaseAsset "ggml-org/llama.cpp" '^llama-.*-bin-win-cpu-x64\.zip$'
+        $onnx = Get-GitHubReleaseAsset "microsoft/onnxruntime" '^onnxruntime-win-x64-[0-9.]+\.zip$'
+    }
     $llm = Get-HuggingFaceFile "Qwen/Qwen3-4B-GGUF" "Qwen3-4B-Q4_K_M.gguf"
     $whisper = Get-HuggingFaceFile "ggerganov/whisper.cpp" "ggml-small-q5_1.bin"
     $silero = Get-GitHubBlob "snakers4/silero-vad" "src/silero_vad/data/silero_vad.onnx"
     $llamaArchive = Join-Path $staging "llama.zip"
     $onnxArchive = Join-Path $staging "onnxruntime.zip"
-    Download-VerifiedFile $application (Join-Path $staging "application/memplua.exe")
-    Download-VerifiedFile $llama $llamaArchive
-    Download-VerifiedFile $onnx $onnxArchive
+    if (-not $ModelsOnly) {
+        Download-VerifiedFile $application (Join-Path $staging "application/memplua.exe")
+        Download-VerifiedFile $llama $llamaArchive
+        Download-VerifiedFile $onnx $onnxArchive
+    }
     Download-VerifiedFile $llm (Join-Path $staging "models/llm.gguf")
     Download-VerifiedFile $whisper (Join-Path $staging "models/whisper.bin")
     Download-VerifiedGitBlob $silero (Join-Path $staging "models/silero.onnx")
     $llamaExtract = Join-Path $staging "llama-extract"
     $onnxExtract = Join-Path $staging "onnx-extract"
-    Expand-Archive -LiteralPath $llamaArchive -DestinationPath $llamaExtract -Force
-    Expand-Archive -LiteralPath $onnxArchive -DestinationPath $onnxExtract -Force
-    $llamaServer = @(Get-ChildItem -LiteralPath $llamaExtract -Filter "llama-server.exe" -File -Recurse)
-    if ($llamaServer.Count -ne 1) { throw "The llama.cpp archive did not contain exactly one llama-server.exe." }
-    $onnxRuntime = @(Get-ChildItem -LiteralPath $onnxExtract -Filter "onnxruntime.dll" -File -Recurse)
-    if ($onnxRuntime.Count -ne 1) { throw "The ONNX Runtime archive did not contain exactly one onnxruntime.dll." }
-    Install-StagedItems @(
-        [PSCustomObject]@{ Source = Join-Path $staging "application/memplua.exe"; Destination = Join-Path $ApplicationDirectory "memplua.exe" }
-        [PSCustomObject]@{ Source = Split-Path -Parent $llamaServer[0].FullName; Destination = Join-Path $AssetsDirectory "runtime/llama" }
-        [PSCustomObject]@{ Source = $onnxRuntime[0].FullName; Destination = Join-Path $AssetsDirectory "runtime/onnxruntime.dll" }
+    $installItems = @(
         [PSCustomObject]@{ Source = Join-Path $staging "models/llm.gguf"; Destination = Join-Path $AssetsDirectory "models/llm.gguf" }
         [PSCustomObject]@{ Source = Join-Path $staging "models/whisper.bin"; Destination = Join-Path $AssetsDirectory "models/whisper.bin" }
         [PSCustomObject]@{ Source = Join-Path $staging "models/silero.onnx"; Destination = Join-Path $AssetsDirectory "models/silero.onnx" }
     )
+    if (-not $ModelsOnly) {
+        Expand-Archive -LiteralPath $llamaArchive -DestinationPath $llamaExtract -Force
+        Expand-Archive -LiteralPath $onnxArchive -DestinationPath $onnxExtract -Force
+        $llamaServer = @(Get-ChildItem -LiteralPath $llamaExtract -Filter "llama-server.exe" -File -Recurse)
+        if ($llamaServer.Count -ne 1) { throw "The llama.cpp archive did not contain exactly one llama-server.exe." }
+        $onnxRuntime = @(Get-ChildItem -LiteralPath $onnxExtract -Filter "onnxruntime.dll" -File -Recurse)
+        if ($onnxRuntime.Count -ne 1) { throw "The ONNX Runtime archive did not contain exactly one onnxruntime.dll." }
+        $installItems = @(
+            [PSCustomObject]@{ Source = Join-Path $staging "application/memplua.exe"; Destination = Join-Path $ApplicationDirectory "memplua.exe" }
+            [PSCustomObject]@{ Source = Split-Path -Parent $llamaServer[0].FullName; Destination = Join-Path $AssetsDirectory "runtime/llama" }
+            [PSCustomObject]@{ Source = $onnxRuntime[0].FullName; Destination = Join-Path $AssetsDirectory "runtime/onnxruntime.dll" }
+        ) + $installItems
+    }
+    Install-StagedItems $installItems
     if (-not [string]::Equals($AssetsDirectory, $ApplicationDirectory, [StringComparison]::OrdinalIgnoreCase)) {
-        Write-ConfiguredModelPaths $AssetsDirectory
+        $runtimeRoot = if ($ModelsOnly) { $ApplicationDirectory } else { $AssetsDirectory }
+        Write-ConfiguredModelPaths $AssetsDirectory $runtimeRoot
     }
     Write-InstallLog "All required models were installed successfully."
     Remove-Item -LiteralPath $LogPath -Force

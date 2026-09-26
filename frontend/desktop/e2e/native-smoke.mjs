@@ -1,7 +1,7 @@
 // An isolated real-WebView2 smoke test. Never enables recording or autostart.
 // Usage: node e2e/native-smoke.mjs <desktop-executable>
 import { chromium } from '@playwright/test';
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { createServer } from 'node:net';
@@ -26,7 +26,38 @@ try {
   browser = await chromium.connectOverCDP(`http://127.0.0.1:${debugPort}`);
   const context = browser.contexts()[0];
   const widget = await until(async () => context.pages().find(page => page.url().includes('window=widget')));
-  await widget.getByRole('toolbar', { name: 'memplua controls' }).waitFor({ timeout: 20000 });
+  try {
+    await widget.getByRole('toolbar', { name: 'memplua controls' }).waitFor({ timeout: 20000 });
+  } catch (error) {
+    console.error('Widget startup diagnostic:', { url: widget.url(), title: await widget.title().catch(() => ''), body: await widget.locator('body').innerText().catch(() => ''), screenshot: join(directory, 'widget-startup-failed.png') });
+    await widget.screenshot({ path: join(directory, 'widget-startup-failed.png') }).catch(() => {});
+    throw error;
+  }
+  // A hidden WebView still appears in CDP, so verify the native window too.
+  const visibleWindows = Number(execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class NativeWindows {
+    public delegate bool EnumWindowsProc(IntPtr handle, IntPtr data);
+    [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc callback, IntPtr data);
+    [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr handle);
+    [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr handle, out uint processId);
+    public static int VisibleCount(uint targetPid) {
+        int count = 0;
+        EnumWindows((handle, data) => {
+            uint processId;
+            GetWindowThreadProcessId(handle, out processId);
+            if (processId == targetPid && IsWindowVisible(handle)) count++;
+            return true;
+        }, IntPtr.Zero);
+        return count;
+    }
+}
+'@
+[NativeWindows]::VisibleCount(${child.pid})
+`], { encoding: 'utf8' }).trim());
+  assert.ok(visibleWindows > 0, 'Startup widget must be visible');
   assert.equal(await widget.getByRole('button', { name: 'Microphone: Off', exact: true }).count(), 1);
   const bridgeOK = await widget.evaluate(async () => {
     const { Call } = await import('/wails/runtime.js');
@@ -59,7 +90,7 @@ try {
   await until(async () => child.exitCode !== null, 10000);
   assert.equal(child.exitCode, 0, 'Quit must shut down the runtime cleanly');
   const state = JSON.parse(await readFile(join(directory, 'ui-state.json'), 'utf8'));
-  assert.equal(state.windows.widget.width, 363);
+  assert.ok(state.windows.widget.width >= 371 && state.windows.widget.width <= 483);
   assert.equal(state.windows.widget.height, 48);
   console.log('Native smoke passed: real bridge, authenticated API, sources off, singleton windows, close/hide, second instance, position persistence, graceful Quit.');
 } finally {

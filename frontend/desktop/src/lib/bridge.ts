@@ -11,7 +11,7 @@ export interface DesktopBridge {
   SetAutostart(value: boolean): Promise<void>;
   ResizeWidget(width: number, height: number): Promise<void>;
 }
-declare global { interface Window { __MEMPLUA_DESKTOP__?: DesktopBridge; _wails?: unknown; } }
+declare global { interface Window { __MEMPLUA_DESKTOP__?: DesktopBridge; _wails?: { flags?: unknown }; } }
 
 // The optional adapter supports local browser integration tests. Credentials never
 // enter URLs, build-time environment variables or browser storage.
@@ -23,8 +23,23 @@ async function call<T>(method: keyof DesktopBridge, ...args: unknown[]): Promise
   const { Call } = await import('@wailsio/runtime');
   return Call.ByName(`crawler/internal/desktop.Shell.${method}`, ...args) as Promise<T>;
 }
-export const isDesktop = () => Boolean(window.__MEMPLUA_DESKTOP__ || window._wails);
-export const bootstrap = () => call<Bootstrap>('Bootstrap');
+export const isDesktop = () => Boolean(window.__MEMPLUA_DESKTOP__ || window.location.hostname === 'wails.localhost' || window._wails?.flags);
+
+// Wails injects its native runtime after the page finishes navigating. The
+// frontend can execute first, especially on a cold WebView2 startup.
+async function waitForDesktopRuntime() {
+  if (window.__MEMPLUA_DESKTOP__) return;
+  const deadline = Date.now() + 15000;
+  while (!window._wails?.flags) {
+    if (Date.now() >= deadline) throw new Error('Desktop runtime did not become ready');
+    await new Promise(resolve => setTimeout(resolve, 25));
+  }
+}
+
+export const bootstrap = async () => {
+  await waitForDesktopRuntime();
+  return call<Bootstrap>('Bootstrap');
+};
 export async function openWindow(name: WindowName, conspectID = '') {
   if (isDesktop()) return call<void>('OpenWindow', name, conspectID);
   const url = new URL(window.location.href); url.search = new URLSearchParams({ window: name, ...(conspectID ? { conspect: conspectID } : {}) }).toString();

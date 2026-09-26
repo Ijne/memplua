@@ -52,4 +52,6 @@ Interested in the implementation or contributing? See the [developer documentati
 
 [WebSite](https://memplua.space/)
 
+[Installation on Windows](docs/installation.md)
+
 [Русская версия](README.ru.md)

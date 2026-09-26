@@ -38,6 +38,12 @@ Inno Setup 6 is required. Optional `-VCRedist` and
 installers. Release output is written to `dist/windows` as
 `memplua-<version>-windows-x64-offline-setup.exe` and must not be committed.
 
+Distribute the offline setup via [memplua.space](https://memplua.space/), whose
+download button points to the file hosted on Hugging Face. GitHub
+Releases hosts the portable ZIP and `SHA256SUMS.txt`, which contains checksums
+for both files. The release publishing script deliberately does not upload the
+offline setup to GitHub because it exceeds GitHub's per-file asset limit.
+
 Before public distribution, inventory and ship the licenses required by the
 selected Qwen LLM, llama.cpp runtime, Whisper, Silero, ONNX Runtime and compiler runtime.
 Sign the final setup executable with an Authenticode certificate to avoid an

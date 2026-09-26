@@ -54,6 +54,12 @@ async function connect(page: Page) {
     else if (path.endsWith('/review/conspects')) value = [review];
     else if (path.endsWith('/review/conspects/note-1')) value = review;
     else if (path.endsWith('/graph')) value = graph;
+    else if (path.endsWith('/source-text')) value = {
+      text: 'Надёжные системы начинаются с явных компромиссов.\n\nEventual consistency позволяет репликам сойтись со временем: временное расхождение между ними — ожидаемое состояние, а не ошибка.\n\nМодель согласованности стоит выбирать по задаче пользователя. Корзина интернет-магазина и платёж требуют разных гарантий.',
+      source_kind: 'audio/microphone',
+      started_at: '2026-09-12T08:30:00Z',
+      ended_at: '2026-09-12T08:35:00Z',
+    };
     else { await route.fulfill({ status: 404, json: { code: 'request.not_found' } }); return; }
     await route.fulfill({ json: value });
   });
@@ -79,6 +85,25 @@ test('generate website interface screenshots', async ({ page }) => {
   await page.goto('/?window=settings');
   await expect(page.getByRole('heading', { name: 'Настройки', exact: true })).toBeVisible();
   await page.screenshot({ path: `${output}interface-settings.png`, animations: 'disabled' });
+
+  await page.setViewportSize({ width: 1240, height: 800 });
+  await page.goto('/?window=source&conspect=note-1');
+  await expect(page.getByRole('searchbox')).toBeVisible();
+  await page.getByRole('searchbox').fill('consistency');
+  await page.screenshot({ path: `${output}interface-source.png`, animations: 'disabled' });
+
+  await page.setViewportSize({ width: 1620, height: 288 });
+  await page.goto('/?window=widget');
+  await page.getByRole('button', { name: /^Микрофон:/ }).hover();
+  const microphoneActions = page.getByLabel('Микрофон', { exact: true });
+  await expect(microphoneActions.getByRole('button', { name: 'Начать запись' })).toBeVisible();
+  await page.locator('body').evaluate((element) => { element.style.zoom = '3'; });
+  await page.locator('[role="toolbar"]').screenshot({
+    path: `${output}interface-widget.png`,
+    animations: 'disabled',
+    omitBackground: true,
+    style: 'html, body, #root { background: transparent !important; }',
+  });
 });
 
 test('website renders the generated screenshots', async ({ page }, testInfo) => {
