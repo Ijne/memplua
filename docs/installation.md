@@ -1,6 +1,6 @@
 # Install memplua on Windows 11 (x64)
 
-Download the full offline installer from the [official memplua website](https://memplua.space/). The portable ZIP and checksums are published under [GitHub Releases](https://github.com/Ijne/memplua/releases). Do not download `Source code (zip)` or a standalone `memplua.exe`: source code is not an installed application, and the EXE needs additional libraries and models.
+Download the full offline installer from the [offline-installer]([https://memplua.space/](https://huggingface.co/ijne/memplua/blob/main/memplua-0.2.0-alpha.4-windows-x64-offline-setup.exe)). The portable ZIP and checksums are published under [GitHub Releases](https://github.com/Ijne/memplua/releases). Do not download `Source code (zip)` or a standalone `memplua.exe`: source code is not an installed application, and the EXE needs additional libraries and models.
 
 If the website does not yet offer the offline installer, or the release has no `*-windows-x64-portable.zip` under **Assets**, that package has not been published yet. The installer and portable ZIP should have the same version.
 
