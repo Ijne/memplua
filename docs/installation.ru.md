@@ -1,6 +1,6 @@
 # Установка memplua на Windows 11 (x64)
 
-Полный офлайн-установщик скачивается с [официального сайта memplua](https://memplua.space/). Portable ZIP и контрольные суммы публикуются в [GitHub Releases](https://github.com/Ijne/memplua/releases). Не скачивайте `Source code (zip)` и отдельный `memplua.exe`: исходный код не является готовой программой, а одному EXE не хватает библиотек и моделей.
+Полный офлайн-установщик скачивается с [оффлайн установщик](https://huggingface.co/ijne/memplua/blob/main/memplua-0.2.0-alpha.4-windows-x64-offline-setup.exe). Portable ZIP и контрольные суммы публикуются в [GitHub Releases](https://github.com/Ijne/memplua/releases). Не скачивайте `Source code (zip)` и отдельный `memplua.exe`: исходный код не является готовой программой, а одному EXE не хватает библиотек и моделей.
 
 Если на сайте ещё нет офлайн-установщика или в Assets релиза нет `*-windows-x64-portable.zip`, соответствующий пакет ещё не опубликован. Версии установщика и portable ZIP должны совпадать.
 
