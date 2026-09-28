@@ -530,7 +530,8 @@ func WithDataDir(cfg Config, directory string) (Config, error) {
 }
 
 func parse(data []byte, cfg *Config) error {
-	scanner := bufio.NewScanner(strings.NewReader(string(data)))
+	// Windows editors and older installers can prefix UTF-8 TOML with a BOM.
+	scanner := bufio.NewScanner(strings.NewReader(strings.TrimPrefix(string(data), "\uFEFF")))
 	section := ""
 	var explicitConspectLanguage *string
 	for lineNumber := 1; scanner.Scan(); lineNumber++ {

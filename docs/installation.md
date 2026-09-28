@@ -12,7 +12,16 @@ If the website does not yet offer the offline installer, or the release has no `
 
 By default, the application is installed in `%LOCALAPPDATA%\Programs\memplua`. Settings and personal data are stored separately in your Windows profile.
 
-## Option 2: Portable ZIP
+## Option 2: Online EXE installer
+
+1. Download `memplua-<version>-windows-x64-online-setup.exe` from [GitHub Release Assets](https://github.com/Ijne/memplua/releases), once published.
+2. Run the EXE and choose the application folder and model storage folder. Models go into the `models` subfolder of the selected storage folder.
+3. Wait for Qwen, Whisper, and Silero to download from `ijne/memplua` on Hugging Face and pass SHA-256 checks. Internet and about 3 GB of model storage are required. The application and all DLLs are already bundled.
+4. Retry on download failure. If cancelled, the application remains installed but is not ready to run; see `model-install.log` in the application folder. Rerun setup or run `download-models.ps1 -AssetsDirectory '<storage folder>'` from the application folder.
+
+After model download, normal use is offline. Silent setup: `/VERYSILENT /NORESTART /DIR="D:\memplua" /MODELDIR="D:\memplua-assets"`. Download failure returns a nonzero exit code.
+
+## Option 3: Portable ZIP
 
 1. Download `memplua-<version>-windows-x64-portable.zip` from **Assets** of the matching [GitHub release](https://github.com/Ijne/memplua/releases). Extract the **entire folder** to a writable location. Do not run the EXE from inside the archive viewer.
 2. Open PowerShell in the extracted folder containing `memplua.exe` and `download-models.ps1`.
@@ -24,7 +33,7 @@ By default, the application is installed in `%LOCALAPPDATA%\Programs\memplua`. S
 
 4. Wait for the download to finish, then run `memplua.exe` from that folder.
 
-The ZIP includes the application, required DLLs, ONNX Runtime, and llama.cpp, but not the models. The script downloads Qwen3-4B-Q4, Whisper small, and Silero from their official publishers, verifies their checksums, and places them under `models\`. This first download requires internet access and about 3 GB of free disk space. Keep the DLLs beside `memplua.exe` and keep the `runtime\` folder.
+The ZIP includes the application, required DLLs, ONNX Runtime, and llama.cpp, but not the models. The script downloads Qwen3-4B-Q4, Whisper small, and Silero from the [memplua Hugging Face repository](https://huggingface.co/ijne/memplua/tree/main), verifies SHA-256 checksums, and places them under `models\`. This first download requires internet access and about 3 GB of free disk space. Keep the DLLs beside `memplua.exe` and keep the `runtime\` folder.
 
 To store models elsewhere, provide an absolute path:
 

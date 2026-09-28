@@ -73,6 +73,7 @@ func serve(arguments []string) error {
 func launchDesktop(arguments []string) error {
 	options, err := loadRuntimeOptions("desktop", arguments)
 	if err != nil {
+		notifyStartupFailure(err)
 		return err
 	}
 	options.Desktop = true

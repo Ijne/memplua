@@ -8,6 +8,27 @@ import (
 	"time"
 )
 
+func TestLoadAcceptsUTF8BOM(t *testing.T) {
+	clearMempluaEnvironment(t)
+	for _, content := range []string{
+		"\uFEFFdata_dir = \"data\"\n[ui]\nlanguage = \"ru\"\n",
+		"\uFEFF# Windows UTF-8 configuration\n[ui]\nlanguage = \"ru\"\n",
+		"\uFEFF[ui]\nlanguage = \"ru\"\n",
+	} {
+		path := filepath.Join(t.TempDir(), "config.toml")
+		if err := os.WriteFile(path, []byte(content), 0600); err != nil {
+			t.Fatal(err)
+		}
+		cfg, err := Load(path)
+		if err != nil {
+			t.Fatalf("load BOM configuration: %v", err)
+		}
+		if cfg.UI.Language != "ru" {
+			t.Fatalf("UI language = %q, want ru", cfg.UI.Language)
+		}
+	}
+}
+
 func TestLoadPrecedenceAndRelativePaths(t *testing.T) {
 	clearMempluaEnvironment(t)
 	directory := t.TempDir()
