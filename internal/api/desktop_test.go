@@ -3,9 +3,11 @@ package api_test
 import (
 	"bufio"
 	"context"
+	"crawler/internal/config"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -174,5 +176,37 @@ func TestSettingsRestartKeysOnlyReportChangedRuntimeSettings(t *testing.T) {
 	}
 	if result.Restart {
 		t.Fatal("unchanged setting requires restart")
+	}
+}
+
+func TestSettingsTimeoutPatch(t *testing.T) {
+	server, _, _, cleanup := newTestServer(t)
+	defer cleanup()
+	patch := map[string]any{"model_startup_timeout": "2m", "model_response_header_timeout": "3m", "model_stream_idle_timeout": "4m", "model_request_timeout": "45m", "audio_transcription_timeout": "8m", "conspect_max_duration": "9m", "conspect_idle_timeout": "2m"}
+	response := callAPI(t, server.Handler(), "PATCH", "/api/v1/settings", patch, 200)
+	var result struct {
+		Settings config.Config `json:"settings"`
+		Restart  bool          `json:"restart_required"`
+		Keys     []string      `json:"restart_keys"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"models.startup_timeout", "models.response_header_timeout", "models.stream_idle_timeout", "models.request_timeout", "pipeline.conspect_max_duration", "pipeline.conspect_idle_timeout", "audio.transcription_timeout"}
+	if !result.Restart || !reflect.DeepEqual(result.Keys, want) || result.Settings.Models.RequestTimeout != 45*time.Minute {
+		t.Fatalf("response=%s", response.Body.String())
+	}
+	response = callAPI(t, server.Handler(), "PATCH", "/api/v1/settings", patch, 200)
+	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Restart || len(result.Keys) != 0 {
+		t.Fatal("unchanged patch requires restart")
+	}
+	before := callAPI(t, server.Handler(), "GET", "/api/v1/settings", nil, 200).Body.String()
+	callAPI(t, server.Handler(), "PATCH", "/api/v1/settings", map[string]any{"model_request_timeout": "0s", "audio_transcription_timeout": "1m"}, 400)
+	after := callAPI(t, server.Handler(), "GET", "/api/v1/settings", nil, 200).Body.String()
+	if before != after {
+		t.Fatal("failed patch changed settings")
 	}
 }

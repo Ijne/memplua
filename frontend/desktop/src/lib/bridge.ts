@@ -10,6 +10,7 @@ export interface DesktopBridge {
   SetAlwaysOnTop(value: boolean): Promise<void>;
   SetAutostart(value: boolean): Promise<void>;
   ResizeWidget(width: number, height: number): Promise<void>;
+  OpenExternalURL?(url: string): Promise<void>;
 }
 declare global { interface Window { __MEMPLUA_DESKTOP__?: DesktopBridge; _wails?: { flags?: unknown }; } }
 
@@ -52,3 +53,10 @@ export const setAlwaysOnTop = (value: boolean) => call<void>('SetAlwaysOnTop', v
 export const setAutostart = (value: boolean) => call<void>('SetAutostart', value);
 export const resizeWidget = (width: number, height: number) => isDesktop() ? call<void>('ResizeWidget', width, height) : Promise.resolve();
 export const quitApp = () => isDesktop() ? call<void>('Quit') : Promise.resolve();
+
+// The optional adapter keeps external navigation out of browser integration tests.
+export async function openExternalURL(url: string): Promise<void> {
+  if (window.__MEMPLUA_DESKTOP__?.OpenExternalURL) return window.__MEMPLUA_DESKTOP__.OpenExternalURL(url);
+  const { Browser } = await import('@wailsio/runtime');
+  await Browser.OpenURL(url);
+}

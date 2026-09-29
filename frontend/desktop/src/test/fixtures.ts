@@ -14,6 +14,6 @@ export const conspect: Conspect = {
 };
 export const settings: Settings = {
   ui: { language: 'en', theme: 'light', always_on_top: true, start_with_windows: false }, conspect: { language: 'en' }, language: 'en',
-  export: { obsidian_directory: '', auto: false }, models: { managed: true, llama_binary: '', llm_model: '', whisper_model: '', silero_model: '', onnx_runtime: '', llm_url: 'http://127.0.0.1:8081', parallel: 1, gpu_layers: 0, server_args: [] }, logging: { level: 'info' }, pipeline: { processing_limit: 1000, review_limit: 500 },
+  export: { obsidian_directory: '', auto: false }, audio: { transcription_timeout: 300000000000 }, models: { startup_timeout: 45000000000, response_header_timeout: 90000000000, stream_idle_timeout: 90000000000, request_timeout: 600000000000, managed: true, llama_binary: '', llm_model: '', whisper_model: '', silero_model: '', onnx_runtime: '', llm_url: 'http://127.0.0.1:8081', parallel: 1, gpu_layers: 0, server_args: [] }, logging: { level: 'info' }, pipeline: { conspect_max_duration: 300000000000, conspect_idle_timeout: 90000000000, processing_limit: 1000, review_limit: 500 },
 };
 export const uiState: UIState = { application: 'running', sources: [{ id: 'microphone', kind: 'audio/microphone', state: 'off', available: true, actions: ['start'] }, { id: 'loopback', kind: 'audio/loopback', state: 'off', available: true, actions: ['start'] }], processing: 'idle', pending_conspects: 1, pending_items: 2 };

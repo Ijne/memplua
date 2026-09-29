@@ -10,6 +10,7 @@ async function connect(page: Page, language: 'en' | 'ru' = 'en', theme: 'light' 
     window.__MEMPLUA_DESKTOP__ = {
       Bootstrap: async () => ({ apiAddress: location.origin, token: 'browser-test-credential', locale: language, systemTheme: 'light', autostart: false }),
       OpenWindow: async (name, id) => { window.dispatchEvent(new CustomEvent('test:window', { detail: { name, id } })); },
+      OpenExternalURL: async (url) => { window.dispatchEvent(new CustomEvent('test:external-url', { detail: url })); },
       HideWindow: async () => {}, Quit: async () => {}, PickFile: async () => '', PickFolder: async () => '', SetAlwaysOnTop: async () => {}, SetAutostart: async () => {}, ResizeWidget: async () => {},
     };
   }, { language });
@@ -73,10 +74,10 @@ test('settings language, theme and keyboard tabs; source search; graph browsing'
   await expect(page.getByRole('heading', { name: 'Настройки', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Тёмное', exact: true }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-  await expect(page).toHaveScreenshot('settings-ru-dark.png');
+  await expect(page).toHaveScreenshot('settings-ru-dark.png', { maxDiffPixelRatio: 0 });
   await page.getByRole('button', { name: 'Сохранить изменения' }).click();
   await page.getByRole('tab', { name: 'Основные' }).focus(); await page.keyboard.press('ArrowRight');
-  await expect(page.getByRole('tab', { name: 'Модели' })).toBeFocused();
+  await expect(page.getByRole('tab', { name: '\u0414\u043b\u044f \u0440\u0430\u0437\u0440\u0430\u0431\u043e\u0442\u0447\u0438\u043a\u043e\u0432' })).toBeFocused();
   await page.setViewportSize({ width: 800, height: 640 }); await page.goto('/?window=source&conspect=note-1');
   await page.getByRole('searchbox').fill('consistency'); await expect(page.locator('mark')).toHaveCount(2);
   await expect(page).toHaveScreenshot('source-ru-dark.png');
@@ -128,4 +129,47 @@ test('widget source controls expand right and move the following controls', asyn
   const nextCollapsed = await nextSource.boundingBox();
   expect(nextCollapsed?.x).toBe(nextBefore?.x);
   await expect(page.getByRole('button', { name: 'Quit memplua', exact: true })).toBeVisible();
+});
+
+for (const language of ['en', 'ru'] as const) test(`advanced timeout settings ${language}`, async ({ page }) => {
+  await connect(page, language, 'dark'); await page.goto('/?window=settings');
+  const advanced = language === 'en' ? 'For developers' : '\u0414\u043b\u044f \u0440\u0430\u0437\u0440\u0430\u0431\u043e\u0442\u0447\u0438\u043a\u043e\u0432';
+  await page.getByRole('tab', { name: advanced }).click();
+  await page.locator('#section-audio').click(); await page.locator('#section-processing').click();
+  const input = page.locator('input[aria-describedby^="model_request_timeout-hint"]');
+  await expect(input).toHaveValue('10m');
+  await expect(page.locator('input[placeholder="90s, 10m"]')).toHaveCount(7);
+  await expect(page).toHaveScreenshot(`settings-timeouts-${language}.png`, { fullPage: true });
+  await input.fill('0s'); await expect(input).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.locator('button[type="submit"]')).toBeDisabled();
+  await input.fill('45m'); await expect(page.locator('button[type="submit"]')).toBeEnabled();
+});
+
+for (const language of ['en', 'ru'] as const) for (const theme of ['light', 'dark'] as const) test(`developer settings ${language} ${theme}`, async ({ page }) => {
+  await connect(page, language, theme); await page.goto('/?window=settings');
+  await page.locator('#tab-basic').focus(); await page.keyboard.press('ArrowRight');
+  await expect(page.locator('#tab-developer')).toBeFocused();
+  await expect(page.getByRole('tab')).toHaveCount(2);
+  await expect(page.locator('#section-llama')).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('#section-audio')).toHaveAttribute('aria-expanded', 'false');
+  await expect(page).toHaveScreenshot(`settings-developer-${language}-${theme}.png`, { fullPage: true });
+  await page.locator('#section-audio').click();
+  const help = page.getByRole('button', { name: language === 'en' ? 'Help: Silero VAD model' : 'Справка: Модель Silero VAD' });
+  await help.click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveScreenshot(`settings-help-${language}-${theme}.png`);
+  const close = page.getByRole('dialog').getByRole('button'); await expect(close).toBeFocused();
+  await page.keyboard.press('Shift+Tab'); await expect(page.getByRole('dialog').getByRole('link').last()).toBeFocused();
+  await page.keyboard.press('Tab'); await expect(close).toBeFocused();
+  await page.evaluate(() => { (window as unknown as { __externalURL?: string }).__externalURL = ''; window.addEventListener('test:external-url', event => { (window as unknown as { __externalURL?: string }).__externalURL = (event as CustomEvent<string>).detail; }); });
+  await page.getByRole('dialog').getByRole('link').click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __externalURL?: string }).__externalURL)).toContain('silero_vad.onnx');
+  await page.keyboard.press('Escape'); await expect(page.getByRole('dialog')).toHaveCount(0); await expect(help).toBeFocused();
+  await page.locator('#settings-whisper_model').fill('C:/models/ggml-small.bin');
+  await page.locator('#tab-basic').click(); await page.locator('#tab-developer').click();
+  await expect(page.locator('#section-audio')).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('#settings-whisper_model')).toHaveValue('C:/models/ggml-small.bin');
+  await page.setViewportSize({ width: 420, height: 720 }); await help.click();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await expect(page.getByRole('dialog')).toHaveScreenshot(`settings-help-narrow-${language}-${theme}.png`);
 });

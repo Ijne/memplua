@@ -140,11 +140,11 @@ func TestLlamaClientTimeoutIsFiniteFailure(t *testing.T) {
 }
 
 func TestLlamaClientPreservesConfiguredLongGenerationTimeout(t *testing.T) {
-	if got := boundedRequestTimeout(10 * time.Minute); got != 10*time.Minute {
+	if got := positiveTimeout(10*time.Minute, config.Default().Models.RequestTimeout); got != 10*time.Minute {
 		t.Fatalf("bounded request timeout = %s, want 10m", got)
 	}
-	if got := boundedRequestTimeout(45 * time.Minute); got != 30*time.Minute {
-		t.Fatalf("maximum request timeout = %s, want 30m", got)
+	if got := positiveTimeout(45*time.Minute, config.Default().Models.RequestTimeout); got != 45*time.Minute {
+		t.Fatalf("maximum request timeout = %s, want 45m", got)
 	}
 }
 

@@ -1,3 +1,5 @@
+import { parseSettingsJSON } from './duration';
+
 let connection: { address: string; token: string } | undefined;
 export function configureAPI(address: string, token: string) { connection = { address: address.replace(/\/$/, ''), token }; }
 export class ApiError extends Error {
@@ -18,5 +20,6 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     const body = await response.json().catch(() => ({})) as { code?: string; error?: string };
     throw new ApiError(response.status, body.code || 'request_failed');
   }
-  return (response.status === 204 ? undefined : await response.json()) as T;
+  if (response.status === 204) return undefined as T;
+  return (path === '/api/v1/settings' ? parseSettingsJSON(await response.text()) : await response.json()) as T;
 }

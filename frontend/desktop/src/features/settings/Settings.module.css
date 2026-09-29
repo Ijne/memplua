@@ -31,4 +31,21 @@
 .footer > span { color: var(--muted); display: flex; align-items: center; gap: 7px; margin-right: auto; font-size: 12px; }
 .footer > span svg { color: var(--success); }
 .restart { padding: 12px 16px; color: var(--warning); border: 1px solid var(--border); border-radius: 10px; }
+.fileField { display: grid; gap: 7px; }
+.path button { flex-shrink: 0; }
+.validation { color: var(--error); }
+.technicalSection { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.technicalSection > h3 > button { width: 100%; justify-content: space-between; text-align: left; border: 0; border-radius: 0; padding: 18px 20px; }
+.technicalSection > h3 > button > span { display: grid; gap: 4px; }
+.technicalSection > h3 > button[aria-expanded='true'] > svg { transform: rotate(180deg); }
+.sectionContent { display: grid; gap: 22px; padding: 20px; border-top: 1px solid var(--border); }
+.helpBackdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px; background: #0008; }
+.helpDialog { width: min(100%, 620px); max-height: calc(100dvh - 40px); overflow-y: auto; display: grid; gap: 22px; padding: 26px; border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); background: var(--surface); box-shadow: var(--shadow); }
+.helpDialog header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.helpDialog header button { flex-shrink: 0; padding: 8px; }
+.helpExample { display: grid; gap: 8px; font-size: 12px; color: var(--muted); }
+.helpExample code { display: block; color: var(--text); background: var(--surface-raised); padding: 12px; border-radius: 8px; overflow-wrap: anywhere; }
+.helpDialog nav { display: grid; gap: 14px; }
+.helpDialog a { display: inline-flex; align-items: center; gap: 8px; color: var(--accent-text); }
+.helpDialog a svg { width: 15px; height: 15px; }
 @media(max-width:600px) { .heading, .body { padding: 24px; } .tabs { padding: 0 20px; } .footer { padding: 16px; flex-wrap: wrap; } .footer > span { width: 100%; } .pair { grid-template-columns: 1fr; } .themes { flex-wrap: wrap; } }

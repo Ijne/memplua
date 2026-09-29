@@ -42,12 +42,13 @@ type LlamaClient struct {
 // NewLlamaClient creates an extraction client without starting a model process.
 func NewLlamaClient(cfg config.Models, language string, taxonomy knowledge.Repository) *LlamaClient {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.ResponseHeaderTimeout = 90 * time.Second
+	defaults := config.Default().Models
+	transport.ResponseHeaderTimeout = positiveTimeout(cfg.ResponseHeaderTimeout, defaults.ResponseHeaderTimeout)
 	return &LlamaClient{
 		baseURL: strings.TrimRight(cfg.LLMURL, "/"), language: language,
-		maxTokens: cfg.MaxTokens, contextSize: cfg.ContextSize, temperature: cfg.Temperature, requestTimeout: cfg.RequestTimeout,
-		httpClient: &http.Client{Timeout: boundedRequestTimeout(cfg.RequestTimeout), Transport: transport}, slots: make(chan struct{}, max(1, cfg.Parallel)), taxonomy: taxonomy,
-		stallTimeout: 90 * time.Second,
+		maxTokens: cfg.MaxTokens, contextSize: cfg.ContextSize, temperature: cfg.Temperature, requestTimeout: positiveTimeout(cfg.RequestTimeout, defaults.RequestTimeout),
+		httpClient: &http.Client{Timeout: positiveTimeout(cfg.RequestTimeout, defaults.RequestTimeout), Transport: transport}, slots: make(chan struct{}, max(1, cfg.Parallel)), taxonomy: taxonomy,
+		stallTimeout: positiveTimeout(cfg.StreamIdleTimeout, defaults.StreamIdleTimeout),
 	}
 }
 
@@ -147,7 +148,7 @@ func (c *LlamaClient) completeInLanguage(ctx context.Context, userPrompt string,
 		var networkError net.Error
 		if errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &networkError) && networkError.Timeout()) {
 			c.restart(err)
-			return "", fmt.Errorf("llama completion timed out after %s: %w", boundedRequestTimeout(c.requestTimeout), err)
+			return "", fmt.Errorf("llama completion timed out (complete request limit %s): %w", positiveTimeout(c.requestTimeout, config.Default().Models.RequestTimeout), err)
 		}
 		return "", fmt.Errorf("%w: llama completion: %v", ingest.ErrPaused, err)
 	}
@@ -214,7 +215,7 @@ func (c *LlamaClient) readStream(ctx context.Context, body io.Reader) (string, e
 	}()
 	timeout := c.stallTimeout
 	if timeout <= 0 {
-		timeout = 90 * time.Second
+		timeout = config.Default().Models.StreamIdleTimeout
 	}
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
@@ -249,13 +250,9 @@ func (c *LlamaClient) restart(err error) {
 	}
 }
 
-func boundedRequestTimeout(value time.Duration) time.Duration {
-	// Large structured extractions may legitimately need more than five minutes
-	// on a local model. Keep the configured ten-minute default intact while
-	// retaining a finite ceiling for stale or manually edited configurations.
-	const maximum = 30 * time.Minute
-	if value <= 0 || value > maximum {
-		return maximum
+func positiveTimeout(value, fallback time.Duration) time.Duration {
+	if value <= 0 {
+		return fallback
 	}
 	return value
 }

@@ -7,7 +7,8 @@ export interface Settings {
   conspect: { language: string };
   language: string;
   export: { obsidian_directory: string; auto: boolean };
-  models: { managed: boolean; llama_binary: string; llm_model: string; llm_url: string; parallel: number; gpu_layers: number; server_args: string[]; whisper_model: string; silero_model: string; onnx_runtime: string };
+  audio: { transcription_timeout: number | string };
+  models: { startup_timeout: number | string; response_header_timeout: number | string; stream_idle_timeout: number | string; request_timeout: number | string; managed: boolean; llama_binary: string; llm_model: string; llm_url: string; parallel: number; gpu_layers: number; server_args: string[]; whisper_model: string; silero_model: string; onnx_runtime: string };
   logging: { level: string };
-  pipeline: { processing_limit: number; review_limit: number };
+  pipeline: { conspect_max_duration: number | string; conspect_idle_timeout: number | string; processing_limit: number; review_limit: number };
 }

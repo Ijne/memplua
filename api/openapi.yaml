@@ -781,6 +781,13 @@ components:
       type: object
       additionalProperties: false
       properties:
+        model_startup_timeout: { type: string, description: "Positive Go duration, e.g. 90s or 10m; applies after restart." }
+        model_response_header_timeout: { type: string, description: "Positive Go duration, e.g. 90s or 10m; applies after restart." }
+        model_stream_idle_timeout: { type: string, description: "Positive Go duration, e.g. 90s or 10m; applies after restart." }
+        model_request_timeout: { type: string, description: "Positive Go duration, e.g. 90s or 10m; applies after restart." }
+        audio_transcription_timeout: { type: string, description: "Positive Go duration, e.g. 90s or 10m; applies after restart." }
+        conspect_max_duration: { type: string, description: "Positive Go duration, e.g. 90s or 10m; applies after restart." }
+        conspect_idle_timeout: { type: string, description: "Positive Go duration, e.g. 90s or 10m; applies after restart." }
         ui_language: { enum: [ru, en] }
         conspect_language: { enum: [ru, en] }
         theme: { enum: [system, light, dark] }

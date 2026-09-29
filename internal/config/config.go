@@ -60,21 +60,23 @@ type API struct {
 
 // Models configures managed/external LLM inference and native speech models.
 type Models struct {
-	Managed        bool          `json:"managed"`
-	LlamaBinary    string        `json:"llama_binary"`
-	LLMModel       string        `json:"llm_model"`
-	LLMURL         string        `json:"llm_url"`
-	Parallel       int           `json:"parallel"`
-	ServerArgs     []string      `json:"server_args"`
-	WhisperModel   string        `json:"whisper_model"`
-	SileroModel    string        `json:"silero_model"`
-	ONNXRuntime    string        `json:"onnx_runtime"`
-	ContextSize    int           `json:"context_size"`
-	GPULayers      int           `json:"gpu_layers"`
-	StartupTimeout time.Duration `json:"startup_timeout"`
-	RequestTimeout time.Duration `json:"request_timeout"`
-	MaxTokens      int           `json:"max_tokens"`
-	Temperature    float64       `json:"temperature"`
+	Managed               bool          `json:"managed"`
+	LlamaBinary           string        `json:"llama_binary"`
+	LLMModel              string        `json:"llm_model"`
+	LLMURL                string        `json:"llm_url"`
+	Parallel              int           `json:"parallel"`
+	ServerArgs            []string      `json:"server_args"`
+	WhisperModel          string        `json:"whisper_model"`
+	SileroModel           string        `json:"silero_model"`
+	ONNXRuntime           string        `json:"onnx_runtime"`
+	ContextSize           int           `json:"context_size"`
+	GPULayers             int           `json:"gpu_layers"`
+	StartupTimeout        time.Duration `json:"startup_timeout"`
+	ResponseHeaderTimeout time.Duration `json:"response_header_timeout"`
+	StreamIdleTimeout     time.Duration `json:"stream_idle_timeout"`
+	RequestTimeout        time.Duration `json:"request_timeout"`
+	MaxTokens             int           `json:"max_tokens"`
+	Temperature           float64       `json:"temperature"`
 }
 
 // Audio configures capture polling, segmentation, transcription, and VAD.
@@ -132,16 +134,18 @@ func Default() Config {
 			TokenFile: "api.token",
 		},
 		Models: Models{
-			Managed:        true,
-			LLMURL:         "http://127.0.0.1:8081",
-			Parallel:       1,
-			ServerArgs:     []string{},
-			ContextSize:    16384,
-			GPULayers:      0,
-			StartupTimeout: 45 * time.Second,
-			RequestTimeout: 10 * time.Minute,
-			MaxTokens:      4096,
-			Temperature:    0.1,
+			Managed:               true,
+			LLMURL:                "http://127.0.0.1:8081",
+			Parallel:              1,
+			ServerArgs:            []string{},
+			ContextSize:           16384,
+			GPULayers:             0,
+			StartupTimeout:        45 * time.Second,
+			RequestTimeout:        10 * time.Minute,
+			ResponseHeaderTimeout: 90 * time.Second,
+			StreamIdleTimeout:     90 * time.Second,
+			MaxTokens:             4096,
+			Temperature:           0.1,
 		},
 		Audio: Audio{
 			TickInterval:         time.Millisecond,
@@ -296,7 +300,7 @@ func (c Config) Validate() error {
 		return errors.New("config: pipeline lease and poll_interval must be positive")
 	}
 	if c.Models.ContextSize < 1 || c.Models.GPULayers < 0 || c.Models.Parallel < 1 || c.Models.StartupTimeout <= 0 ||
-		c.Models.RequestTimeout <= 0 || c.Models.MaxTokens < 1 || c.Models.Temperature < 0 || c.Models.Temperature > 2 {
+		c.Models.RequestTimeout <= 0 || c.Models.ResponseHeaderTimeout <= 0 || c.Models.StreamIdleTimeout <= 0 || c.Models.MaxTokens < 1 || c.Models.Temperature < 0 || c.Models.Temperature > 2 {
 		return errors.New("config: invalid model runtime parameters")
 	}
 	if c.Audio.TickInterval <= 0 || c.Audio.SegmentLength <= 0 || c.Audio.TranscriptionTimeout <= 0 || c.Audio.VADWindow < 1 ||
@@ -358,6 +362,14 @@ func (c Config) Validate() error {
 
 // SettingsPatch is the allowlisted set of values writable through the UI API.
 type SettingsPatch struct {
+	ModelStartupTimeout        *string `json:"model_startup_timeout,omitempty"`
+	ModelResponseHeaderTimeout *string `json:"model_response_header_timeout,omitempty"`
+	ModelStreamIdleTimeout     *string `json:"model_stream_idle_timeout,omitempty"`
+	ModelRequestTimeout        *string `json:"model_request_timeout,omitempty"`
+	AudioTranscriptionTimeout  *string `json:"audio_transcription_timeout,omitempty"`
+	ConspectMaxDuration        *string `json:"conspect_max_duration,omitempty"`
+	ConspectIdleTimeout        *string `json:"conspect_idle_timeout,omitempty"`
+
 	UILanguage        *string   `json:"ui_language,omitempty"`
 	ConspectLanguage  *string   `json:"conspect_language,omitempty"`
 	Theme             *string   `json:"theme,omitempty"`
@@ -414,6 +426,29 @@ func (m *Manager) Update(patch SettingsPatch) (Config, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	next := m.cfg
+	for _, duration := range []struct {
+		key    string
+		input  *string
+		target *time.Duration
+	}{
+		{"model_startup_timeout", patch.ModelStartupTimeout, &next.Models.StartupTimeout},
+		{"model_response_header_timeout", patch.ModelResponseHeaderTimeout, &next.Models.ResponseHeaderTimeout},
+		{"model_stream_idle_timeout", patch.ModelStreamIdleTimeout, &next.Models.StreamIdleTimeout},
+		{"model_request_timeout", patch.ModelRequestTimeout, &next.Models.RequestTimeout},
+		{"audio_transcription_timeout", patch.AudioTranscriptionTimeout, &next.Audio.TranscriptionTimeout},
+		{"conspect_max_duration", patch.ConspectMaxDuration, &next.Pipeline.ConspectMaxDuration},
+		{"conspect_idle_timeout", patch.ConspectIdleTimeout, &next.Pipeline.ConspectIdleTimeout},
+	} {
+		if duration.input == nil {
+			continue
+		}
+		value, err := time.ParseDuration(*duration.input)
+		if err != nil || value <= 0 {
+			return Config{}, fmt.Errorf("config: %s must be a positive duration (e.g. 90s or 10m)", duration.key)
+		}
+		*duration.target = value
+	}
+
 	if patch.Language != nil {
 		next.Language = *patch.Language
 		next.Conspect.Language = *patch.Language
@@ -638,6 +673,10 @@ func assign(cfg *Config, key, raw string) error {
 		cfg.Models.GPULayers, err = intValue()
 	case "models.startup_timeout":
 		cfg.Models.StartupTimeout, err = durationValue()
+	case "models.response_header_timeout":
+		cfg.Models.ResponseHeaderTimeout, err = durationValue()
+	case "models.stream_idle_timeout":
+		cfg.Models.StreamIdleTimeout, err = durationValue()
 	case "models.request_timeout":
 		cfg.Models.RequestTimeout, err = durationValue()
 	case "models.max_tokens":
@@ -833,6 +872,12 @@ func applyEnvironment(cfg *Config) error {
 	if err := setDuration("MEMPLUA_MODEL_STARTUP_TIMEOUT", &cfg.Models.StartupTimeout); err != nil {
 		return err
 	}
+	if err := setDuration("MEMPLUA_MODEL_RESPONSE_HEADER_TIMEOUT", &cfg.Models.ResponseHeaderTimeout); err != nil {
+		return err
+	}
+	if err := setDuration("MEMPLUA_MODEL_STREAM_IDLE_TIMEOUT", &cfg.Models.StreamIdleTimeout); err != nil {
+		return err
+	}
 	if err := setDuration("MEMPLUA_MODEL_REQUEST_TIMEOUT", &cfg.Models.RequestTimeout); err != nil {
 		return err
 	}
@@ -962,6 +1007,8 @@ onnx_runtime = %q
 context_size = %d
 gpu_layers = %d
 startup_timeout = %q
+response_header_timeout = %q
+stream_idle_timeout = %q
 request_timeout = %q
 max_tokens = %d
 temperature = %g
@@ -1006,7 +1053,7 @@ auto = %t
 		cfg.Models.Parallel, serverArgs,
 		cfg.Models.WhisperModel, cfg.Models.SileroModel, cfg.Models.ONNXRuntime,
 		cfg.Models.ContextSize, cfg.Models.GPULayers, cfg.Models.StartupTimeout,
-		cfg.Models.RequestTimeout, cfg.Models.MaxTokens, cfg.Models.Temperature,
+		cfg.Models.ResponseHeaderTimeout, cfg.Models.StreamIdleTimeout, cfg.Models.RequestTimeout, cfg.Models.MaxTokens, cfg.Models.Temperature,
 		cfg.Audio.TickInterval, cfg.Audio.SegmentLength, cfg.Audio.TranscriptionTimeout, cfg.Audio.VADWindow, cfg.Audio.VADThreshold,
 		cfg.Storage.Database, cfg.Pipeline.ConspectMaxDuration, cfg.Pipeline.ConspectIdleTimeout, cfg.Pipeline.BatchSweepInterval, cfg.Pipeline.ContextTailChars, cfg.Pipeline.SimilarityThreshold, cfg.Pipeline.SimilarityLimit, cfg.Pipeline.ProcessingLimit,
 		cfg.Pipeline.ReviewLimit, cfg.Pipeline.Workers, cfg.Pipeline.MaxAttempts,

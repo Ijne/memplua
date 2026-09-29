@@ -73,7 +73,9 @@ to TOML or browser storage.
 | `context_size` | llama-server context length |
 | `gpu_layers` | layers requested on GPU; `0` means CPU |
 | `startup_timeout` | readiness deadline for managed server |
-| `request_timeout` | complete extraction deadline |
+| `response_header_timeout` | HTTP response header deadline; default `90s` |
+| `stream_idle_timeout` | wait for first/next parsed SSE event; default `90s` |
+| `request_timeout` | complete HTTP request and response deadline; default `10m`, no hidden ceiling |
 | `max_tokens` | maximum completion tokens; client also applies a safety bound |
 | `temperature` | generation temperature from `0` through `2` |
 
@@ -81,6 +83,24 @@ The application owns model, host, port, context, GPU-layer, and parallel flags.
 Those flags are rejected inside `server_args` to prevent contradictory launches.
 With `managed=false`, memplua never starts or stops the external model
 process, but still waits for its health before inference.
+
+## Time limits
+
+The For developers tab exposes model startup, headers, stream inactivity,
+complete request, Whisper transcription, batch collection, and batch inactivity.
+Use positive Go durations such as `90s`, `10m`, or `1h30m`; zero does not disable
+a limit. Changes are saved atomically and apply after restarting the app.
+
+The complete LLM deadline still applies while stream events arrive. Header and
+stream inactivity limits can end a request earlier. These limits apply to LLM
+analysis after Whisper, not to audio recognition itself. Whisper's per-segment
+timeout also covers text delivery; its native call checks the context before and
+after computation rather than guaranteeing immediate interruption. Batch limits
+determine when accumulated text is queued for analysis, not how long models run.
+
+The new limits support `MEMPLUA_MODEL_RESPONSE_HEADER_TIMEOUT` and
+`MEMPLUA_MODEL_STREAM_IDLE_TIMEOUT` environment overrides. Settings GET keeps
+duration numbers in nanoseconds; PATCH accepts duration strings.
 
 ## `[audio]`
 
@@ -151,3 +171,34 @@ writes the entire TOML atomically. UI language, theme, conspect language, and
 some presentation/export settings apply live. Model executable/runtime options,
 native model paths, worker topology, and similar construction-time values are
 reported in `restart_keys` and take effect after restart.
+
+## Desktop settings layout
+
+The General tab contains language, appearance, window behavior, autostart and
+Obsidian export. All manual component configuration is in For developers:
+
+- **Llama server:** managed/external mode, executable, GGUF model, loopback URL,
+  GPU layers, parallel requests, optional arguments and LLM time limits.
+- **Speech recognition and libraries:** Whisper, Silero ONNX, ONNX Runtime and
+  transcription time limit.
+- **Text processing:** batch collection/inactivity and processing/review limits.
+- **Diagnostics:** logging detail.
+
+Sections expand independently and retain their state while switching tabs.
+The Llama section starts expanded. Edits share Save and Cancel across sections;
+invalid time limits are marked even when their section is collapsed.
+
+Each component file has a help button explaining the expected file, an example
+path and upstream sources. Links open in the system browser. Full installations
+normally provide ready-to-use paths; manual downloads are for customization.
+Silero is loaded directly from `silero_vad.onnx`: a Python installation is not
+required. ONNX Runtime expects `onnxruntime.dll` from a compatible Windows x64
+package. Keep the complete runtime package when replacing native components.
+
+In managed mode memplua starts `llama-server.exe` with the configured GGUF and
+launch parameters. External mode expects a separately started server at the
+configured URL; these launch parameters do not configure that server. Request
+time limits still apply. GPU offload requires a compatible server build and
+sufficient video memory; `0` GPU layers means CPU. Each optional argument and
+its value go on separate lines. Do not duplicate application-owned flags for
+model, host, port, GPU layers, context size or parallel requests.
